@@ -19,6 +19,7 @@ import {
   RotateCcw,
   RotateCw,
   Scaling,
+  Settings,
   Subtitles,
   Volume1,
   Volume2,
@@ -28,7 +29,32 @@ import {
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 const SUBTITLE_CHUNK_SECONDS = 60;
-const SUBTITLE_CACHE_VERSION = "v2";
+const SUBTITLE_CACHE_VERSION = "v8";
+const PLAYER_SETTINGS_KEY = "lumen-player-settings";
+
+interface PlayerSettings {
+  enhanced: boolean;
+  upscaled: boolean;
+  enhancementIntensity: number;
+  upscaleIntensity: number;
+  subtitlesEnabled: boolean;
+  subtitleSize: number;
+  volume: number;
+  muted: boolean;
+  speed: number;
+}
+
+const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
+  enhanced: false,
+  upscaled: false,
+  enhancementIntensity: 60,
+  upscaleIntensity: 60,
+  subtitlesEnabled: false,
+  subtitleSize: 1.1,
+  volume: 1,
+  muted: false,
+  speed: 1,
+};
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
@@ -70,6 +96,10 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
   const [scrubbing, setScrubbing] = useState(false);
   const [enhanced, setEnhanced] = useState(false);
   const [upscaled, setUpscaled] = useState(false);
+  const [enhancementIntensity, setEnhancementIntensity] = useState(60);
+  const [upscaleIntensity, setUpscaleIntensity] = useState(60);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsLoadedRef = useRef(false);
   const [subtitlesEnabled, setSubtitlesEnabled] = useState(false);
   const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null);
   const [subtitleLoading, setSubtitleLoading] = useState(false);
@@ -80,6 +110,54 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
   const subtitleLoadedRef = useRef(new Set<number>());
   const subtitleInFlightRef = useRef(new Set<number>());
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(PLAYER_SETTINGS_KEY);
+      const settings = saved
+        ? { ...DEFAULT_PLAYER_SETTINGS, ...(JSON.parse(saved) as Partial<PlayerSettings>) }
+        : DEFAULT_PLAYER_SETTINGS;
+      setEnhanced(settings.enhanced);
+      setUpscaled(settings.upscaled);
+      setEnhancementIntensity(settings.enhancementIntensity);
+      setUpscaleIntensity(settings.upscaleIntensity);
+      setSubtitlesEnabled(settings.subtitlesEnabled);
+      setSubtitleSize(settings.subtitleSize);
+      setVolume(settings.volume);
+      setMuted(settings.muted);
+      setSpeed(settings.speed);
+    } catch {
+      // Keep safe defaults when browser storage is unavailable or malformed.
+    } finally {
+      settingsLoadedRef.current = true;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!settingsLoadedRef.current) return;
+    const settings: PlayerSettings = {
+      enhanced,
+      upscaled,
+      enhancementIntensity,
+      upscaleIntensity,
+      subtitlesEnabled,
+      subtitleSize,
+      volume,
+      muted,
+      speed,
+    };
+    localStorage.setItem(PLAYER_SETTINGS_KEY, JSON.stringify(settings));
+  }, [
+    enhanced,
+    upscaled,
+    enhancementIntensity,
+    upscaleIntensity,
+    subtitlesEnabled,
+    subtitleSize,
+    volume,
+    muted,
+    speed,
+  ]);
 
   /* Wire media element events to React state. */
   useEffect(() => {
@@ -346,6 +424,27 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
   }, [current, loadSubtitleChunk, subtitleLoading, subtitlesEnabled]);
 
   useEffect(() => {
+    if (!settingsLoadedRef.current || !subtitlesEnabled || subtitleChunks.length > 0) return;
+    const start = Math.floor(current / SUBTITLE_CHUNK_SECONDS) * SUBTITLE_CHUNK_SECONDS;
+    setSubtitleLoading(true);
+    void loadSubtitleChunk(start)
+      .catch((subtitleError) => {
+        setError(
+          subtitleError instanceof Error ? subtitleError.message : "Subtitle generation failed.",
+        );
+      })
+      .finally(() => setSubtitleLoading(false));
+  }, [current, loadSubtitleChunk, subtitleChunks.length, subtitlesEnabled]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.volume = volume;
+    video.muted = muted;
+    video.playbackRate = speed;
+  }, [muted, speed, volume]);
+
+  useEffect(() => {
     if (subtitleChunks.length === 0) return;
     const vtt = [
       "WEBVTT",
@@ -441,12 +540,16 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
         style={{
           filter:
             [
-              enhanced ? "brightness(1.06) contrast(1.14) saturate(1.16)" : "",
-              upscaled ? "contrast(1.08) saturate(1.08)" : "",
+              enhanced
+                ? `brightness(${1 + enhancementIntensity * 0.001}) contrast(${1 + enhancementIntensity * 0.0025}) saturate(${1 + enhancementIntensity * 0.0025})`
+                : "",
+              upscaled
+                ? `contrast(${1 + upscaleIntensity * 0.0015}) saturate(${1 + upscaleIntensity * 0.0012})`
+                : "",
             ]
               .filter(Boolean)
               .join(" ") || undefined,
-          transform: upscaled ? "scale(1.008)" : undefined,
+          transform: upscaled ? `scale(${1 + upscaleIntensity * 0.00015})` : undefined,
           willChange: upscaled || enhanced ? "filter, transform" : undefined,
         }}
         onClick={togglePlay}
@@ -663,6 +766,47 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
                   <Scaling className="h-5 w-5" />
                 </ControlButton>
 
+                <div className="relative">
+                  <ControlButton
+                    label="Player settings"
+                    active={settingsOpen}
+                    onClick={() => setSettingsOpen((value) => !value)}
+                  >
+                    <Settings className="h-5 w-5" />
+                  </ControlButton>
+                  <AnimatePresence>
+                    {settingsOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                        className="glass-strong absolute right-0 bottom-full z-20 mb-3 w-64 rounded-xl p-3 text-xs"
+                      >
+                        <p className="mb-3 font-semibold text-foreground">Playback settings</p>
+                        <SettingSlider
+                          label={`Enhancement ${enhancementIntensity}%`}
+                          value={enhancementIntensity}
+                          onChange={setEnhancementIntensity}
+                        />
+                        <SettingSlider
+                          label={`Upscaling ${upscaleIntensity}%`}
+                          value={upscaleIntensity}
+                          onChange={setUpscaleIntensity}
+                        />
+                        <label className="mt-3 flex items-center justify-between gap-3 text-muted-foreground">
+                          <span>Subtitles by default</span>
+                          <input
+                            type="checkbox"
+                            checked={subtitlesEnabled}
+                            onChange={(event) => setSubtitlesEnabled(event.target.checked)}
+                            className="accent-primary"
+                          />
+                        </label>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
                 <ControlButton
                   label={
                     subtitleLoading
@@ -719,5 +863,30 @@ function ControlButton({
     >
       {children}
     </button>
+  );
+}
+
+function SettingSlider({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="mb-3 block text-muted-foreground">
+      <span className="mb-1 block">{label}</span>
+      <input
+        type="range"
+        min={10}
+        max={100}
+        step={5}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="volume-slider w-full"
+      />
+    </label>
   );
 }

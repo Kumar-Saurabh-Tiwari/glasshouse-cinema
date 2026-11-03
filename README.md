@@ -31,17 +31,22 @@ npm run dev
 
 The development server runs at `http://localhost:8888`.
 
-### Local English subtitles
+### English subtitles
 
-The player can generate English subtitles from Japanese audio using local
-Whisper inference. Install the optional Python dependency once:
+The player generates timestamped English subtitles from Japanese audio in
+60-second chunks. When `GROQ_API_KEY` is configured, it uses Groq's
+`whisper-large-v3-turbo` transcription model with Japanese detection, then
+translates each timestamped line through Google's translation endpoint. This
+keeps the original timing while producing natural English. The API key stays
+on the server and only short extracted audio chunks are uploaded. If Groq or
+translation is unavailable, local Whisper remains available as a fallback.
+Install the optional Python dependency once:
 
 ```sh
 python -m pip install -r requirements-subtitles.txt
 ```
 
-The player generates subtitles in 60-second chunks while the video plays, so
-it does not wait for the full movie. The first request downloads the default
-`base` Whisper model, which provides a better accuracy/speed balance for
-Japanese translation. Set `WHISPER_MODEL=small` when higher translation
-quality is preferred, or set `PYTHON_PATH` if Python is not on the system PATH.
+The player does not wait for the full movie. The first local request downloads
+the default `base` Whisper model. Set `WHISPER_MODEL=small` when higher local
+translation quality is preferred, or set `PYTHON_PATH` if Python is not on the
+system PATH.
