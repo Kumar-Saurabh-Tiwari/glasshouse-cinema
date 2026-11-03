@@ -1,0 +1,517 @@
+/**
+ * VideoPlayer — custom HTML5 video wrapper with a full glass control bar.
+ *
+ * Controls: play/pause, seek (click + drag), skip ±10s, volume (slider +
+ * mute), playback speed menu, fullscreen. Keyboard shortcuts: space/k play,
+ * ←/→ seek 5s, j/l seek 10s, ↑/↓ volume, m mute, f fullscreen.
+ */
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  Gauge,
+  Loader2,
+  Maximize,
+  Minimize,
+  Pause,
+  Play,
+  RotateCcw,
+  RotateCw,
+  Volume1,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
+
+const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
+
+function formatTime(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+  const total = Math.floor(seconds);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const mm = String(m).padStart(h > 0 ? 2 : 1, "0");
+  const ss = String(s).padStart(2, "0");
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+interface VideoPlayerProps {
+  src: string;
+  title: string;
+  poster?: string | null;
+  autoPlay?: boolean;
+}
+
+export function VideoPlayer({
+  src,
+  title,
+  poster,
+  autoPlay = true,
+}: VideoPlayerProps) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  const hideTimerRef = useRef<number | null>(null);
+
+  const [playing, setPlaying] = useState(false);
+  const [waiting, setWaiting] = useState(false);
+  const [current, setCurrent] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [bufferedEnd, setBufferedEnd] = useState(0);
+  const [volume, setVolume] = useState(1);
+  const [muted, setMuted] = useState(false);
+  const [speed, setSpeed] = useState(1);
+  const [speedOpen, setSpeedOpen] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const [scrubbing, setScrubbing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /* Wire media element events to React state. */
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const onLoaded = () => {
+      setDuration(video.duration || 0);
+      setVolume(video.volume);
+      setMuted(video.muted);
+    };
+    const onTime = () => setCurrent(video.currentTime);
+    const onDuration = () => setDuration(video.duration || 0);
+    const onPlay = () => setPlaying(true);
+    const onPause = () => setPlaying(false);
+    const onWaiting = () => setWaiting(true);
+    const onPlaying = () => setWaiting(false);
+    const onProgress = () => {
+      if (video.buffered.length > 0) {
+        setBufferedEnd(video.buffered.end(video.buffered.length - 1));
+      }
+    };
+    const onError = () =>
+      setError(
+        "This file can't be played here. MP4 (H.264) and WebM work everywhere; some AVI, MKV or MOV files use codecs browsers don't support.",
+      );
+
+    video.addEventListener("loadedmetadata", onLoaded);
+    video.addEventListener("durationchange", onDuration);
+    video.addEventListener("timeupdate", onTime);
+    video.addEventListener("play", onPlay);
+    video.addEventListener("pause", onPause);
+    video.addEventListener("waiting", onWaiting);
+    video.addEventListener("playing", onPlaying);
+    video.addEventListener("ended", onPause);
+    video.addEventListener("progress", onProgress);
+    video.addEventListener("error", onError);
+
+    return () => {
+      video.removeEventListener("loadedmetadata", onLoaded);
+      video.removeEventListener("durationchange", onDuration);
+      video.removeEventListener("timeupdate", onTime);
+      video.removeEventListener("play", onPlay);
+      video.removeEventListener("pause", onPause);
+      video.removeEventListener("waiting", onWaiting);
+      video.removeEventListener("playing", onPlaying);
+      video.removeEventListener("ended", onPause);
+      video.removeEventListener("progress", onProgress);
+      video.removeEventListener("error", onError);
+    };
+  }, [src]);
+
+  /* Reset transient state when a different video is loaded. */
+  useEffect(() => {
+    setCurrent(0);
+    setDuration(0);
+    setBufferedEnd(0);
+    setError(null);
+    setWaiting(false);
+    setPlaying(false);
+  }, [src]);
+
+  /* Keep fullscreen state in sync when the user exits with ESC/system UI. */
+  useEffect(() => {
+    const onFullscreenChange = () =>
+      setFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () =>
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
+  /* Auto-hide the control bar after 2.5s of inactivity while playing. */
+  const bumpControls = useCallback(() => {
+    setControlsVisible(true);
+    if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = window.setTimeout(() => {
+      const video = videoRef.current;
+      if (video && !video.paused) setControlsVisible(false);
+    }, 2500);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (hideTimerRef.current) window.clearTimeout(hideTimerRef.current);
+    },
+    [],
+  );
+
+  const togglePlay = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.paused) {
+      void video.play().catch(() => setPlaying(false));
+    } else {
+      video.pause();
+    }
+  }, []);
+
+  const seekBy = useCallback((delta: number) => {
+    const video = videoRef.current;
+    if (!video || !Number.isFinite(video.duration)) return;
+    const next = Math.min(Math.max(video.currentTime + delta, 0), video.duration);
+    video.currentTime = next;
+    setCurrent(next);
+  }, []);
+
+  const changeVolume = useCallback((value: number) => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.volume = value;
+    setVolume(value);
+    if (value > 0 && video.muted) {
+      video.muted = false;
+      setMuted(false);
+    }
+  }, []);
+
+  const toggleMute = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.muted = !video.muted;
+    setMuted(video.muted);
+  }, []);
+
+  const applySpeed = useCallback((value: number) => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.playbackRate = value;
+    setSpeed(value);
+    setSpeedOpen(false);
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    const shell = shellRef.current;
+    if (!shell) return;
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        await shell.requestFullscreen();
+      }
+    } catch {
+      /* Fullscreen can be blocked by the browser — ignore. */
+    }
+  }, []);
+
+  /* Keyboard shortcuts (active while the player is mounted). */
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      switch (event.key) {
+        case " ":
+        case "k":
+          event.preventDefault();
+          togglePlay();
+          break;
+        case "ArrowRight":
+          event.preventDefault();
+          seekBy(5);
+          break;
+        case "ArrowLeft":
+          event.preventDefault();
+          seekBy(-5);
+          break;
+        case "l":
+          seekBy(10);
+          break;
+        case "j":
+          seekBy(-10);
+          break;
+        case "ArrowUp":
+          event.preventDefault();
+          changeVolume(Math.min((videoRef.current?.volume ?? 1) + 0.1, 1));
+          break;
+        case "ArrowDown":
+          event.preventDefault();
+          changeVolume(Math.max((videoRef.current?.volume ?? 1) - 0.1, 0));
+          break;
+        case "m":
+          toggleMute();
+          break;
+        case "f":
+          void toggleFullscreen();
+          break;
+        default:
+          return;
+      }
+      bumpControls();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [togglePlay, seekBy, changeVolume, toggleMute, toggleFullscreen, bumpControls]);
+
+  /* Seek bar: click or drag anywhere on the track. */
+  const seekFromClientX = (clientX: number) => {
+    const bar = barRef.current;
+    const video = videoRef.current;
+    if (!bar || !video || !duration) return;
+    const rect = bar.getBoundingClientRect();
+    const ratio = Math.min(Math.max((clientX - rect.left) / rect.width, 0), 1);
+    const next = ratio * duration;
+    video.currentTime = next;
+    setCurrent(next);
+  };
+
+  const progressPct = duration > 0 ? (current / duration) * 100 : 0;
+  const bufferedPct = duration > 0 ? (bufferedEnd / duration) * 100 : 0;
+  const shownControls = controlsVisible || !playing || scrubbing;
+  const effectiveVolume = muted ? 0 : volume;
+
+  return (
+    <div
+      ref={shellRef}
+      onPointerMove={bumpControls}
+      onPointerDown={bumpControls}
+      className="relative aspect-video w-full overflow-hidden rounded-2xl bg-card select-none"
+    >
+      <video
+        ref={videoRef}
+        src={src}
+        poster={poster ?? undefined}
+        autoPlay={autoPlay}
+        playsInline
+        className="h-full w-full object-contain"
+        onClick={togglePlay}
+        onDoubleClick={() => void toggleFullscreen()}
+      />
+
+      {/* Buffering spinner */}
+      {waiting && !error && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary/80" />
+        </div>
+      )}
+
+      {/* Unplayable codec / missing file */}
+      {error && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-card/80 p-8 text-center backdrop-blur-md">
+          <p className="font-display text-lg font-semibold text-foreground">
+            {title} can't be played
+          </p>
+          <p className="max-w-md text-sm text-muted-foreground">{error}</p>
+        </div>
+      )}
+
+      {/* Big center play button when paused */}
+      <AnimatePresence>
+        {!playing && !error && !waiting && (
+          <motion.button
+            key="center-play"
+            type="button"
+            aria-label="Play"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ duration: 0.2 }}
+            onClick={togglePlay}
+            className="glass-strong glow-primary absolute top-1/2 left-1/2 flex h-20 w-20 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-primary"
+          >
+            <Play className="h-8 w-8 translate-x-0.5 fill-current" />
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* Control bar */}
+      <AnimatePresence>
+        {shownControls && !error && (
+          <motion.div
+            key="controls"
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 14 }}
+            transition={{ duration: 0.2 }}
+            className="absolute inset-x-0 bottom-0 z-10 px-3 pb-3 sm:px-4 sm:pb-4"
+          >
+            <div className="glass-strong rounded-2xl px-3 pt-2 pb-2 sm:px-4">
+              {/* Seek track */}
+              <div
+                ref={barRef}
+                role="slider"
+                aria-label="Seek"
+                aria-valuemin={0}
+                aria-valuemax={Math.round(duration)}
+                aria-valuenow={Math.round(current)}
+                tabIndex={0}
+                onPointerDown={(event) => {
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                  setScrubbing(true);
+                  seekFromClientX(event.clientX);
+                }}
+                onPointerMove={(event) => {
+                  if (scrubbing) seekFromClientX(event.clientX);
+                }}
+                onPointerUp={() => setScrubbing(false)}
+                onPointerCancel={() => setScrubbing(false)}
+                className="group/bar relative my-1 flex h-6 cursor-pointer items-center"
+              >
+                <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="absolute inset-y-0 left-0 bg-primary/25"
+                    style={{ width: `${bufferedPct}%` }}
+                  />
+                  <div
+                    className="absolute inset-y-0 left-0 bg-primary"
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
+                <div
+                  className="absolute h-3.5 w-3.5 rounded-full bg-primary opacity-0 shadow-md transition-opacity group-hover/bar:opacity-100"
+                  style={{
+                    left: `calc(${progressPct}% - 0.4375rem)`,
+                    opacity: scrubbing ? 1 : undefined,
+                  }}
+                />
+              </div>
+
+              {/* Buttons row */}
+              <div className="flex items-center gap-1 text-foreground sm:gap-1.5">
+                <ControlButton
+                  label={playing ? "Pause" : "Play"}
+                  onClick={togglePlay}
+                >
+                  {playing ? (
+                    <Pause className="h-5 w-5 fill-current" />
+                  ) : (
+                    <Play className="h-5 w-5 fill-current" />
+                  )}
+                </ControlButton>
+
+                <ControlButton label="Back 10 seconds" onClick={() => seekBy(-10)}>
+                  <RotateCcw className="h-5 w-5" />
+                </ControlButton>
+                <ControlButton label="Forward 10 seconds" onClick={() => seekBy(10)}>
+                  <RotateCw className="h-5 w-5" />
+                </ControlButton>
+
+                <span className="ml-1 font-mono text-xs tabular-nums text-muted-foreground sm:text-sm">
+                  {formatTime(current)} / {formatTime(duration)}
+                </span>
+
+                <div className="flex-1" />
+
+                {/* Volume: mute toggle + slider */}
+                <div className="group/vol flex items-center gap-1.5">
+                  <ControlButton label={muted ? "Unmute" : "Mute"} onClick={toggleMute}>
+                    {muted || volume === 0 ? (
+                      <VolumeX className="h-5 w-5" />
+                    ) : effectiveVolume < 0.5 ? (
+                      <Volume1 className="h-5 w-5" />
+                    ) : (
+                      <Volume2 className="h-5 w-5" />
+                    )}
+                  </ControlButton>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={effectiveVolume}
+                    onChange={(event) =>
+                      changeVolume(Number.parseFloat(event.target.value))
+                    }
+                    aria-label="Volume"
+                    className="volume-slider w-0 opacity-0 transition-all duration-300 group-hover/vol:w-20 group-hover/vol:opacity-100 focus:w-20 focus:opacity-100 sm:group-hover/vol:w-24"
+                  />
+                </div>
+
+                {/* Playback speed menu */}
+                <div className="relative">
+                  <ControlButton
+                    label="Playback speed"
+                    active={speed !== 1 || speedOpen}
+                    onClick={() => setSpeedOpen((open) => !open)}
+                  >
+                    <Gauge className="h-5 w-5" />
+                  </ControlButton>
+                  <AnimatePresence>
+                    {speedOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                        transition={{ duration: 0.15 }}
+                        className="glass-strong absolute right-0 bottom-full z-20 mb-3 w-28 overflow-hidden rounded-xl py-1 text-sm"
+                      >
+                        {SPEEDS.map((value) => (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => applySpeed(value)}
+                            className={`flex w-full cursor-pointer items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-accent ${
+                              speed === value
+                                ? "font-semibold text-primary"
+                                : "text-foreground"
+                            }`}
+                          >
+                            <span>{value}×</span>
+                            {speed === value && (
+                              <span className="text-xs text-primary">✓</span>
+                            )}
+                          </button>
+                        ))}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+
+                <ControlButton
+                  label={fullscreen ? "Exit fullscreen" : "Fullscreen"}
+                  onClick={() => void toggleFullscreen()}
+                >
+                  {fullscreen ? (
+                    <Minimize className="h-5 w-5" />
+                  ) : (
+                    <Maximize className="h-5 w-5" />
+                  )}
+                </ControlButton>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function ControlButton({
+  label,
+  onClick,
+  active = false,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  active?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className={`flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-accent ${
+        active ? "text-primary" : "text-foreground"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
