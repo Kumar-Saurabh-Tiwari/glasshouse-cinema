@@ -78,21 +78,36 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "Lumen — Your Personal Cinema" },
+      {
+        name: "description",
+        content: "A private cinema library for watching local videos and browsing the web.",
+      },
+      { name: "author", content: "Lumen" },
+      { property: "og:title", content: "Lumen — Your Personal Cinema" },
+      {
+        property: "og:description",
+        content: "A private cinema library for watching local videos and browsing the web.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
     ],
     links: [
       {
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      {
+        rel: "icon",
+        href: "/lumen-favicon.svg?v=2",
+        type: "image/svg+xml",
+        sizes: "any",
+      },
+      {
+        rel: "shortcut icon",
+        href: "/lumen-favicon.svg?v=2",
+        type: "image/svg+xml",
+      },
     ],
   }),
   shellComponent: RootShell,

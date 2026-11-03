@@ -17,6 +17,7 @@ import {
   Search,
   Settings2,
   SlidersHorizontal,
+  Sun,
   TriangleAlert,
   X,
 } from "lucide-react";
@@ -27,6 +28,7 @@ import { MovieCard } from "@/components/MovieCard";
 import { VideoPlayer } from "@/components/VideoPlayer";
 
 type LibraryView = "grid" | "cards" | "list";
+type LibraryTheme = "dark" | "light";
 const LIBRARY_SETTINGS_KEY = "lumen-library-settings";
 const PLAYER_SETTINGS_KEY = "lumen-player-settings-v2";
 
@@ -41,6 +43,7 @@ export function VideoLibrary() {
   const [detailsVideo, setDetailsVideo] = useState<VideoMeta | null>(null);
   const [view, setView] = useState<LibraryView>("grid");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [theme, setTheme] = useState<LibraryTheme>("dark");
   const [defaultSubtitles, setDefaultSubtitles] = useState(false);
   const [defaultEnhancement, setDefaultEnhancement] = useState(false);
   const [defaultUpscaling, setDefaultUpscaling] = useState(false);
@@ -49,10 +52,12 @@ export function VideoLibrary() {
     try {
       const saved = JSON.parse(localStorage.getItem(LIBRARY_SETTINGS_KEY) ?? "{}") as {
         view?: LibraryView;
+        theme?: LibraryTheme;
       };
       if (saved.view === "grid" || saved.view === "cards" || saved.view === "list") {
         setView(saved.view);
       }
+      if (saved.theme === "light" || saved.theme === "dark") setTheme(saved.theme);
       const player = JSON.parse(localStorage.getItem(PLAYER_SETTINGS_KEY) ?? "{}") as {
         subtitlesEnabled?: boolean;
         enhanced?: boolean;
@@ -66,10 +71,31 @@ export function VideoLibrary() {
     }
   }, []);
 
+  useEffect(() => {
+    document.documentElement.classList.toggle("light", theme === "light");
+  }, [theme]);
+
   const saveLibraryView = (nextView: LibraryView) => {
     setView(nextView);
     try {
-      localStorage.setItem(LIBRARY_SETTINGS_KEY, JSON.stringify({ view: nextView }));
+      const current = JSON.parse(localStorage.getItem(LIBRARY_SETTINGS_KEY) ?? "{}");
+      localStorage.setItem(
+        LIBRARY_SETTINGS_KEY,
+        JSON.stringify({ ...current, view: nextView, theme }),
+      );
+    } catch {
+      // Preferences remain active for this session.
+    }
+  };
+
+  const saveTheme = (nextTheme: LibraryTheme) => {
+    setTheme(nextTheme);
+    try {
+      const current = JSON.parse(localStorage.getItem(LIBRARY_SETTINGS_KEY) ?? "{}");
+      localStorage.setItem(
+        LIBRARY_SETTINGS_KEY,
+        JSON.stringify({ ...current, theme: nextTheme, view }),
+      );
     } catch {
       // Preferences remain active for this session.
     }
@@ -202,6 +228,28 @@ export function VideoLibrary() {
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">Saved for your next video.</p>
                     <div className="mt-4 space-y-3 text-sm">
+                      <div className="border-b border-white/10 pb-3">
+                        <p className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-wide text-foreground uppercase">
+                          <Sun className="h-3.5 w-3.5 text-primary" />
+                          Appearance
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {(["dark", "light"] as const).map((value) => (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() => saveTheme(value)}
+                              className={`rounded-lg border px-3 py-2 text-xs font-semibold capitalize transition-colors ${
+                                theme === value
+                                  ? "border-primary/60 bg-primary/15 text-primary"
+                                  : "border-border/60 text-muted-foreground hover:bg-accent hover:text-foreground"
+                              }`}
+                            >
+                              {value === "light" ? "Warm light" : "Cinema dark"}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                       {[
                         ["Subtitles", defaultSubtitles, "subtitlesEnabled"],
                         ["Quality enhancement", defaultEnhancement, "enhanced"],

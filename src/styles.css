@@ -85,6 +85,30 @@
   --glow-primary: 0 0 44px -12px color-mix(in oklab, var(--primary) 62%, transparent);
 }
 
+html.light {
+  --background: oklch(0.93 0.018 78);
+  --foreground: oklch(0.25 0.035 55);
+  --card: oklch(0.965 0.014 78);
+  --card-foreground: oklch(0.25 0.035 55);
+  --popover: oklch(0.975 0.016 78);
+  --popover-foreground: oklch(0.25 0.035 55);
+  --primary: oklch(0.54 0.1 65);
+  --primary-foreground: oklch(0.99 0.02 85);
+  --secondary: oklch(0.88 0.025 75);
+  --secondary-foreground: oklch(0.3 0.04 55);
+  --muted: oklch(0.88 0.022 75);
+  --muted-foreground: oklch(0.48 0.035 55);
+  --accent: oklch(0.86 0.04 70);
+  --accent-foreground: oklch(0.28 0.04 55);
+  --border: oklch(0.5 0.05 65 / 18%);
+  --input: oklch(0.4 0.05 65 / 14%);
+  --ring: oklch(0.54 0.1 65);
+  --glass-bg: oklch(1 0 0 / 34%);
+  --glass-bg-strong: oklch(0.97 0.016 78 / 88%);
+  --glass-border: oklch(0.5 0.06 65 / 18%);
+  --glow-primary: 0 0 36px -14px color-mix(in oklab, var(--primary) 28%, transparent);
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
@@ -99,6 +123,15 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
     color-scheme: dark;
+  }
+
+  html.light body {
+    background:
+      radial-gradient(900px 560px at 8% -10%, oklch(0.96 0.05 78 / 0.7), transparent 68%),
+      radial-gradient(900px 620px at 100% 0%, oklch(0.88 0.045 48 / 0.45), transparent 70%),
+      radial-gradient(800px 560px at 50% 110%, oklch(0.89 0.035 95 / 0.5), transparent 72%),
+      linear-gradient(145deg, oklch(0.95 0.018 85), oklch(0.88 0.03 55));
+    color-scheme: light;
   }
 
   ::selection {
