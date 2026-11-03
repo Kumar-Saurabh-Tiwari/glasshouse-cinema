@@ -26,7 +26,7 @@ import type { VideoMeta, VideosResponse } from "@/lib/types";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { MovieCard } from "@/components/MovieCard";
 import { VideoPlayer } from "@/components/VideoPlayer";
-import { readWatchHistory, type WatchHistoryEntry } from "@/lib/watch-history";
+import { readWatchHistory, removeWatchHistory, type WatchHistoryEntry } from "@/lib/watch-history";
 
 type LibraryView = "grid" | "cards" | "list";
 type LibraryTheme = "dark" | "light";
@@ -392,24 +392,43 @@ export function VideoLibrary() {
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {historyVideos.map(({ entry, video }) => (
-              <button
+              <div
                 key={video.id}
-                type="button"
-                onClick={() => setSelected(video)}
-                className="glass group overflow-hidden rounded-2xl text-left transition-transform hover:-translate-y-1"
+                className="glass group relative overflow-hidden rounded-2xl text-left transition-transform hover:-translate-y-1"
               >
-                <div className="relative aspect-video">
-                  {video.thumbnailUrl ? (
-                    <img src={video.thumbnailUrl} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="h-full w-full bg-primary/10" />
-                  )}
-                  <span className="absolute right-2 bottom-2 rounded-md bg-black/75 px-2 py-1 text-[11px] font-medium text-white">
-                    {formatDuration(entry.duration - entry.currentTime)} left
-                  </span>
-                </div>
-                <p className="truncate p-3 text-sm font-semibold text-foreground">{video.title}</p>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setSelected(video)}
+                  className="block w-full text-left"
+                  aria-label={`Continue watching ${video.title}`}
+                >
+                  <div className="relative aspect-video">
+                    {video.thumbnailUrl ? (
+                      <img src={video.thumbnailUrl} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="h-full w-full bg-primary/10" />
+                    )}
+                    <span className="absolute right-2 bottom-2 rounded-md bg-black/75 px-2 py-1 text-[11px] font-medium text-white">
+                      {formatDuration(entry.duration - entry.currentTime)} left
+                    </span>
+                  </div>
+                  <p className="truncate p-3 text-sm font-semibold text-foreground">
+                    {video.title}
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Remove ${video.title} from history`}
+                  title="Remove from history"
+                  onClick={() => {
+                    removeWatchHistory(video.fileName);
+                    setWatchHistory(readWatchHistory());
+                  }}
+                  className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/75 text-sm text-white/80 opacity-0 transition-opacity hover:bg-destructive hover:text-white group-hover:opacity-100 focus-visible:opacity-100"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
             ))}
           </div>
         </section>

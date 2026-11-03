@@ -36,6 +36,15 @@ export function saveWatchProgress(fileName: string, currentTime: number, duratio
   }
 }
 
+export function removeWatchHistory(fileName: string): void {
+  const history = readWatchHistory().filter((entry) => entry.fileName !== fileName);
+  try {
+    sessionStorage.setItem(WATCH_HISTORY_KEY, JSON.stringify(history));
+  } catch {
+    // Session history is best effort when browser storage is unavailable.
+  }
+}
+
 function isWatchHistoryEntry(value: unknown): value is WatchHistoryEntry {
   if (!value || typeof value !== "object") return false;
   const entry = value as Partial<WatchHistoryEntry>;
