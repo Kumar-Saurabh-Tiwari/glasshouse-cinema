@@ -5,7 +5,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { FolderOpen, Search, SlidersHorizontal, TriangleAlert, X } from "lucide-react";
+import { FolderOpen, Info, Search, SlidersHorizontal, TriangleAlert, X } from "lucide-react";
 
 import type { VideoMeta, VideosResponse } from "@/lib/types";
 import { formatBytes, formatDuration } from "@/lib/format";
@@ -20,6 +20,7 @@ export function VideoLibrary() {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [resolutionFilter, setResolutionFilter] = useState("all");
   const [selected, setSelected] = useState<VideoMeta | null>(null);
+  const [detailsVideo, setDetailsVideo] = useState<VideoMeta | null>(null);
 
   /* Load the library once on mount. */
   useEffect(() => {
@@ -176,7 +177,12 @@ export function VideoLibrary() {
         >
           <AnimatePresence mode="popLayout">
             {filtered.map((video) => (
-              <MovieCard key={video.id} video={video} onSelect={setSelected} />
+              <MovieCard
+                key={video.id}
+                video={video}
+                onSelect={setSelected}
+                onDetails={setDetailsVideo}
+              />
             ))}
           </AnimatePresence>
         </motion.div>
@@ -193,6 +199,52 @@ export function VideoLibrary() {
           </p>
         </div>
       )}
+
+      <AnimatePresence>
+        {detailsVideo && (
+          <motion.aside
+            initial={{ opacity: 0, x: 32 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 32 }}
+            className="glass-strong fixed top-4 right-4 bottom-4 z-40 w-[min(360px,calc(100vw-2rem))] overflow-y-auto rounded-3xl p-5 shadow-2xl sm:p-6"
+            aria-label="Video details"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <Info className="h-5 w-5 text-primary" />
+                <h2 className="font-display text-xl font-bold text-foreground">Details</h2>
+              </div>
+              <button
+                type="button"
+                aria-label="Close details"
+                onClick={() => setDetailsVideo(null)}
+                className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <h3 className="font-display mt-8 text-lg font-semibold leading-snug text-foreground">
+              {detailsVideo.title}
+            </h3>
+            <dl className="mt-6 space-y-4 text-sm">
+              <DetailRow label="Resolution" value={detailsVideo.resolution ?? "Unavailable"} />
+              <DetailRow label="Duration" value={formatDuration(detailsVideo.durationSeconds)} />
+              <DetailRow label="File size" value={formatBytes(detailsVideo.sizeBytes)} />
+              <DetailRow label="File name" value={detailsVideo.fileName} />
+            </dl>
+            <button
+              type="button"
+              onClick={() => {
+                setDetailsVideo(null);
+                setSelected(detailsVideo);
+              }}
+              className="mt-8 flex w-full cursor-pointer items-center justify-center rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+            >
+              Play video
+            </button>
+          </motion.aside>
+        )}
+      </AnimatePresence>
 
       {/* Player overlay */}
       <AnimatePresence>
@@ -235,6 +287,7 @@ export function VideoLibrary() {
               </div>
               <VideoPlayer
                 src={selected.streamUrl}
+                fileName={selected.fileName}
                 title={selected.title}
                 poster={selected.thumbnailUrl}
               />
@@ -245,6 +298,15 @@ export function VideoLibrary() {
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="border-b border-white/10 pb-3">
+      <dt className="text-xs uppercase tracking-wider text-muted-foreground">{label}</dt>
+      <dd className="mt-1 break-words text-foreground">{value}</dd>
     </div>
   );
 }

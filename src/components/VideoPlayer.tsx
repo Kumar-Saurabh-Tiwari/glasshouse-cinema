@@ -11,18 +11,24 @@ import {
   Gauge,
   Loader2,
   Maximize,
+  Minus,
   Minimize,
   Pause,
   Play,
+  Plus,
   RotateCcw,
   RotateCw,
-  Sparkles,
+  Scaling,
+  Subtitles,
   Volume1,
   Volume2,
   VolumeX,
+  WandSparkles,
 } from "lucide-react";
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
+const SUBTITLE_CHUNK_SECONDS = 60;
+const SUBTITLE_CACHE_VERSION = "v2";
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
@@ -37,13 +43,15 @@ function formatTime(seconds: number): string {
 
 interface VideoPlayerProps {
   src: string;
+  fileName: string;
   title: string;
   poster?: string | null;
   autoPlay?: boolean;
 }
 
-export function VideoPlayer({ src, title, poster, autoPlay = true }: VideoPlayerProps) {
+export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const trackRef = useRef<HTMLTrackElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const hideTimerRef = useRef<number | null>(null);
@@ -61,6 +69,16 @@ export function VideoPlayer({ src, title, poster, autoPlay = true }: VideoPlayer
   const [controlsVisible, setControlsVisible] = useState(true);
   const [scrubbing, setScrubbing] = useState(false);
   const [enhanced, setEnhanced] = useState(false);
+  const [upscaled, setUpscaled] = useState(false);
+  const [subtitlesEnabled, setSubtitlesEnabled] = useState(false);
+  const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null);
+  const [subtitleLoading, setSubtitleLoading] = useState(false);
+  const [subtitleSize, setSubtitleSize] = useState(1.1);
+  const [subtitleChunks, setSubtitleChunks] = useState<Array<{ start: number; text: string }>>([]);
+  const subtitleCacheKey = `lumen-subtitles-${SUBTITLE_CACHE_VERSION}:${fileName}`;
+  const subtitleChunkRef = useRef(0);
+  const subtitleLoadedRef = useRef(new Set<number>());
+  const subtitleInFlightRef = useRef(new Set<number>());
   const [error, setError] = useState<string | null>(null);
 
   /* Wire media element events to React state. */
@@ -122,6 +140,12 @@ export function VideoPlayer({ src, title, poster, autoPlay = true }: VideoPlayer
     setError(null);
     setWaiting(false);
     setPlaying(false);
+    setSubtitlesEnabled(false);
+    setSubtitleLoading(false);
+    setSubtitleChunks([]);
+    subtitleChunkRef.current = 0;
+    subtitleLoadedRef.current.clear();
+    subtitleInFlightRef.current.clear();
   }, [src]);
 
   /* Keep fullscreen state in sync when the user exits with ESC/system UI. */
@@ -268,6 +292,137 @@ export function VideoPlayer({ src, title, poster, autoPlay = true }: VideoPlayer
   const bufferedPct = duration > 0 ? (bufferedEnd / duration) * 100 : 0;
   const shownControls = controlsVisible || !playing || scrubbing;
   const effectiveVolume = muted ? 0 : volume;
+  const subtitleSizeClass =
+    subtitleSize < 1
+      ? "subtitle-size-small"
+      : subtitleSize > 1.2
+        ? "subtitle-size-large"
+        : "subtitle-size-medium";
+
+  const loadSubtitleChunk = useCallback(
+    async (start: number) => {
+      if (subtitleLoadedRef.current.has(start) || subtitleInFlightRef.current.has(start)) {
+        return;
+      }
+      subtitleInFlightRef.current.add(start);
+      try {
+        const response = await fetch(
+          `/api/videos/subtitles?file=${encodeURIComponent(fileName)}&start=${Math.floor(start)}&duration=${SUBTITLE_CHUNK_SECONDS}`,
+        );
+        if (!response.ok) throw new Error(await response.text());
+        const text = await response.text();
+        subtitleLoadedRef.current.add(start);
+        setSubtitleChunks((chunks) =>
+          [...chunks, { start, text }].sort((a, b) => a.start - b.start),
+        );
+        subtitleChunkRef.current = Math.max(
+          subtitleChunkRef.current,
+          start + SUBTITLE_CHUNK_SECONDS,
+        );
+      } finally {
+        subtitleInFlightRef.current.delete(start);
+      }
+    },
+    [fileName],
+  );
+
+  useEffect(() => {
+    if (!subtitlesEnabled || subtitleLoading || !Number.isFinite(current)) {
+      return;
+    }
+    const currentChunk = Math.floor(current / SUBTITLE_CHUNK_SECONDS) * SUBTITLE_CHUNK_SECONDS;
+    const nextChunk = currentChunk + SUBTITLE_CHUNK_SECONDS;
+    void (async () => {
+      try {
+        await loadSubtitleChunk(currentChunk);
+        await loadSubtitleChunk(nextChunk);
+      } catch (subtitleError) {
+        if (subtitleLoadedRef.current.has(currentChunk)) return;
+        setError(
+          subtitleError instanceof Error ? subtitleError.message : "Subtitle generation failed.",
+        );
+      }
+    })();
+  }, [current, loadSubtitleChunk, subtitleLoading, subtitlesEnabled]);
+
+  useEffect(() => {
+    if (subtitleChunks.length === 0) return;
+    const vtt = [
+      "WEBVTT",
+      "",
+      ...subtitleChunks.flatMap((chunk) =>
+        chunk.text
+          .replace(/^WEBVTT\s*/i, "")
+          .trim()
+          .split(/\r?\n/),
+      ),
+      "",
+    ].join("\n");
+    const nextUrl = URL.createObjectURL(new Blob([vtt], { type: "text/vtt" }));
+    setSubtitleUrl((previousUrl) => {
+      if (previousUrl) URL.revokeObjectURL(previousUrl);
+      return nextUrl;
+    });
+  }, [subtitleChunks]);
+
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem(subtitleCacheKey);
+      if (!cached) return;
+      const chunks = JSON.parse(cached) as Array<{ start: number; text: string }>;
+      chunks.forEach((chunk) => subtitleLoadedRef.current.add(chunk.start));
+      setSubtitleChunks(chunks);
+      subtitleChunkRef.current = chunks.reduce(
+        (next, chunk) => Math.max(next, chunk.start + SUBTITLE_CHUNK_SECONDS),
+        0,
+      );
+    } catch {
+      localStorage.removeItem(subtitleCacheKey);
+    }
+  }, [subtitleCacheKey]);
+
+  useEffect(() => {
+    if (subtitleChunks.length === 0) return;
+    try {
+      localStorage.setItem(subtitleCacheKey, JSON.stringify(subtitleChunks));
+    } catch {
+      // Subtitle caching is best effort when browser storage is unavailable.
+    }
+  }, [subtitleCacheKey, subtitleChunks]);
+
+  const toggleSubtitles = useCallback(async () => {
+    if (subtitlesEnabled) {
+      setSubtitlesEnabled((value) => !value);
+      return;
+    }
+
+    setSubtitleLoading(true);
+    setError(null);
+    try {
+      subtitleChunkRef.current =
+        Math.floor(current / SUBTITLE_CHUNK_SECONDS) * SUBTITLE_CHUNK_SECONDS;
+      await loadSubtitleChunk(subtitleChunkRef.current);
+      setSubtitlesEnabled(true);
+    } catch (subtitleError) {
+      setError(
+        subtitleError instanceof Error ? subtitleError.message : "Subtitle generation failed.",
+      );
+    } finally {
+      setSubtitleLoading(false);
+    }
+  }, [current, loadSubtitleChunk, subtitlesEnabled]);
+
+  useEffect(() => {
+    if (trackRef.current) {
+      trackRef.current.track.mode = subtitlesEnabled ? "showing" : "hidden";
+    }
+  }, [subtitlesEnabled, subtitleUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (subtitleUrl) URL.revokeObjectURL(subtitleUrl);
+    };
+  }, [subtitleUrl]);
 
   return (
     <div
@@ -282,17 +437,32 @@ export function VideoPlayer({ src, title, poster, autoPlay = true }: VideoPlayer
         poster={poster ?? undefined}
         autoPlay={autoPlay}
         playsInline
-        className="h-full w-full object-contain transition-[filter] duration-300"
-        style={
-          enhanced
-            ? {
-                filter: "brightness(1.06) contrast(1.14) saturate(1.16)",
-              }
-            : undefined
-        }
+        className={`h-full w-full object-contain transition-[filter] duration-300 ${subtitleSizeClass}`}
+        style={{
+          filter:
+            [
+              enhanced ? "brightness(1.06) contrast(1.14) saturate(1.16)" : "",
+              upscaled ? "contrast(1.08) saturate(1.08)" : "",
+            ]
+              .filter(Boolean)
+              .join(" ") || undefined,
+          transform: upscaled ? "scale(1.008)" : undefined,
+          willChange: upscaled || enhanced ? "filter, transform" : undefined,
+        }}
         onClick={togglePlay}
         onDoubleClick={() => void toggleFullscreen()}
-      />
+      >
+        {subtitleUrl && (
+          <track
+            ref={trackRef}
+            kind="subtitles"
+            src={subtitleUrl}
+            srcLang="en"
+            label="English"
+            default={subtitlesEnabled}
+          />
+        )}
+      </video>
 
       {/* Buffering spinner */}
       {waiting && !error && (
@@ -469,7 +639,46 @@ export function VideoPlayer({ src, title, poster, autoPlay = true }: VideoPlayer
                   active={enhanced}
                   onClick={() => setEnhanced((value) => !value)}
                 >
-                  <Sparkles className="h-5 w-5" />
+                  <WandSparkles className="h-5 w-5" />
+                </ControlButton>
+
+                <ControlButton
+                  label="Decrease subtitle size"
+                  onClick={() => setSubtitleSize((value) => Math.max(0.8, value - 0.1))}
+                >
+                  <Minus className="h-4 w-4" />
+                </ControlButton>
+                <ControlButton
+                  label="Increase subtitle size"
+                  onClick={() => setSubtitleSize((value) => Math.min(1.5, value + 0.1))}
+                >
+                  <Plus className="h-4 w-4" />
+                </ControlButton>
+
+                <ControlButton
+                  label={upscaled ? "Disable upscale preview" : "Enable upscale preview"}
+                  active={upscaled}
+                  onClick={() => setUpscaled((value) => !value)}
+                >
+                  <Scaling className="h-5 w-5" />
+                </ControlButton>
+
+                <ControlButton
+                  label={
+                    subtitleLoading
+                      ? "Generating English subtitles"
+                      : subtitlesEnabled
+                        ? "Disable English subtitles"
+                        : "Generate English subtitles"
+                  }
+                  active={subtitlesEnabled}
+                  onClick={() => void toggleSubtitles()}
+                >
+                  {subtitleLoading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <Subtitles className="h-5 w-5" />
+                  )}
                 </ControlButton>
 
                 <ControlButton

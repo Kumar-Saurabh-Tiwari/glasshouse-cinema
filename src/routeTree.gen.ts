@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiVideosRouteImport } from './routes/api/videos'
 import { Route as ApiVideosStreamRouteImport } from './routes/api/videos.stream'
+import { Route as ApiVideosSubtitlesRouteImport } from './routes/api/videos.subtitles'
 import { Route as ApiVideosThumbnailRouteImport } from './routes/api/videos.thumbnail'
 
 const IndexRoute = IndexRouteImport.update({
@@ -29,6 +30,11 @@ const ApiVideosStreamRoute = ApiVideosStreamRouteImport.update({
   path: '/stream',
   getParentRoute: () => ApiVideosRoute,
 } as any)
+const ApiVideosSubtitlesRoute = ApiVideosSubtitlesRouteImport.update({
+  id: '/subtitles',
+  path: '/subtitles',
+  getParentRoute: () => ApiVideosRoute,
+} as any)
 const ApiVideosThumbnailRoute = ApiVideosThumbnailRouteImport.update({
   id: '/thumbnail',
   path: '/thumbnail',
@@ -39,12 +45,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/videos': typeof ApiVideosRouteWithChildren
   '/api/videos/stream': typeof ApiVideosStreamRoute
+  '/api/videos/subtitles': typeof ApiVideosSubtitlesRoute
   '/api/videos/thumbnail': typeof ApiVideosThumbnailRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/videos': typeof ApiVideosRouteWithChildren
   '/api/videos/stream': typeof ApiVideosStreamRoute
+  '/api/videos/subtitles': typeof ApiVideosSubtitlesRoute
   '/api/videos/thumbnail': typeof ApiVideosThumbnailRoute
 }
 export interface FileRoutesById {
@@ -52,19 +60,30 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/api/videos': typeof ApiVideosRouteWithChildren
   '/api/videos/stream': typeof ApiVideosStreamRoute
+  '/api/videos/subtitles': typeof ApiVideosSubtitlesRoute
   '/api/videos/thumbnail': typeof ApiVideosThumbnailRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/api/videos' | '/api/videos/stream' | '/api/videos/thumbnail'
+    | '/'
+    | '/api/videos'
+    | '/api/videos/stream'
+    | '/api/videos/subtitles'
+    | '/api/videos/thumbnail'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/videos' | '/api/videos/stream' | '/api/videos/thumbnail'
+  to:
+    | '/'
+    | '/api/videos'
+    | '/api/videos/stream'
+    | '/api/videos/subtitles'
+    | '/api/videos/thumbnail'
   id:
     | '__root__'
     | '/'
     | '/api/videos'
     | '/api/videos/stream'
+    | '/api/videos/subtitles'
     | '/api/videos/thumbnail'
   fileRoutesById: FileRoutesById
 }
@@ -96,6 +115,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiVideosStreamRouteImport
       parentRoute: typeof ApiVideosRoute
     }
+    '/api/videos/subtitles': {
+      id: '/api/videos/subtitles'
+      path: '/subtitles'
+      fullPath: '/api/videos/subtitles'
+      preLoaderRoute: typeof ApiVideosSubtitlesRouteImport
+      parentRoute: typeof ApiVideosRoute
+    }
     '/api/videos/thumbnail': {
       id: '/api/videos/thumbnail'
       path: '/thumbnail'
@@ -108,11 +134,13 @@ declare module '@tanstack/react-router' {
 
 interface ApiVideosRouteChildren {
   ApiVideosStreamRoute: typeof ApiVideosStreamRoute
+  ApiVideosSubtitlesRoute: typeof ApiVideosSubtitlesRoute
   ApiVideosThumbnailRoute: typeof ApiVideosThumbnailRoute
 }
 
 const ApiVideosRouteChildren: ApiVideosRouteChildren = {
   ApiVideosStreamRoute: ApiVideosStreamRoute,
+  ApiVideosSubtitlesRoute: ApiVideosSubtitlesRoute,
   ApiVideosThumbnailRoute: ApiVideosThumbnailRoute,
 }
 

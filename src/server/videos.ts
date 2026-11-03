@@ -27,6 +27,18 @@ export const VIDEO_EXTENSIONS = new Set([".mp4", ".webm", ".avi", ".mov", ".mkv"
 
 const FFMPEG_BIN = () => process.env["FFMPEG_PATH"] || "ffmpeg";
 const FFPROBE_BIN = () => process.env["FFPROBE_PATH"] || "ffprobe";
+let ffmpegAvailablePromise: Promise<boolean> | undefined;
+
+function isFfmpegAvailable(): Promise<boolean> {
+  if (!ffmpegAvailablePromise) {
+    ffmpegAvailablePromise = execFileAsync(FFMPEG_BIN(), ["-version"], {
+      timeout: 3_000,
+    })
+      .then(() => true)
+      .catch(() => false);
+  }
+  return ffmpegAvailablePromise;
+}
 
 /**
  * The folder to scan. Configurable through VIDEOS_DIRECTORY; falls back to
@@ -211,6 +223,7 @@ export async function getThumbnailPath(fileName: string): Promise<string | null>
  */
 export async function listVideos(): Promise<VideosResponse> {
   const dir = getVideosDirectory();
+  const thumbnailsAvailable = await isFfmpegAvailable();
 
   let entries;
   try {
@@ -247,7 +260,7 @@ export async function listVideos(): Promise<VideosResponse> {
         durationSeconds: duration,
         resolution,
         streamUrl: `/api/videos/stream${query}`,
-        thumbnailUrl: `/api/videos/thumbnail${query}`,
+        thumbnailUrl: thumbnailsAvailable ? `/api/videos/thumbnail${query}` : null,
       };
     }),
   );

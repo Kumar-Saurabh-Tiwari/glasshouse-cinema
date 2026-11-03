@@ -28,3 +28,20 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+The development server runs at `http://localhost:8888`.
+
+### Local English subtitles
+
+The player can generate English subtitles from Japanese audio using local
+Whisper inference. Install the optional Python dependency once:
+
+```sh
+python -m pip install -r requirements-subtitles.txt
+```
+
+The player generates subtitles in 60-second chunks while the video plays, so
+it does not wait for the full movie. The first request downloads the default
+`base` Whisper model, which provides a better accuracy/speed balance for
+Japanese translation. Set `WHISPER_MODEL=small` when higher translation
+quality is preferred, or set `PYTHON_PATH` if Python is not on the system PATH.

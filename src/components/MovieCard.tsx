@@ -5,7 +5,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Clapperboard, Play } from "lucide-react";
+import { Clapperboard, Info, Play } from "lucide-react";
 
 import type { VideoMeta } from "@/lib/types";
 import { formatDuration } from "@/lib/format";
@@ -13,9 +13,10 @@ import { formatDuration } from "@/lib/format";
 interface MovieCardProps {
   video: VideoMeta;
   onSelect: (video: VideoMeta) => void;
+  onDetails: (video: VideoMeta) => void;
 }
 
-export function MovieCard({ video, onSelect }: MovieCardProps) {
+export function MovieCard({ video, onSelect, onDetails }: MovieCardProps) {
   const [thumbFailed, setThumbFailed] = useState(false);
   const [generatedThumb, setGeneratedThumb] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
@@ -80,9 +81,8 @@ export function MovieCard({ video, onSelect }: MovieCardProps) {
   };
 
   return (
-    <motion.button
+    <motion.div
       layout
-      type="button"
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.94 }}
@@ -90,6 +90,14 @@ export function MovieCard({ video, onSelect }: MovieCardProps) {
       whileHover={{ y: -8 }}
       whileTap={{ scale: 0.98 }}
       onClick={() => onSelect(video)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect(video);
+        }
+      }}
       onMouseEnter={startPreview}
       onMouseLeave={stopPreview}
       className="glass card-glow group relative block w-full cursor-pointer overflow-hidden rounded-3xl border-white/5 text-left transition-[border-color,box-shadow] duration-300 hover:border-primary/25 hover:shadow-[0_30px_70px_-30px_oklch(0_0_0/80%),var(--glow-primary)] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
@@ -153,14 +161,29 @@ export function MovieCard({ video, onSelect }: MovieCardProps) {
 
         {/* Title block */}
         <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
-          <h3 className="font-display line-clamp-1 text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+          <h3
+            title={video.title}
+            className="font-display line-clamp-2 min-h-[3.5rem] text-lg font-semibold tracking-tight text-foreground sm:text-xl"
+          >
             {video.title}
           </h3>
-          <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground sm:text-sm">
-            {video.fileName}
+          <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+            {video.resolution ?? "Resolution unavailable"}
           </p>
+          <button
+            type="button"
+            aria-label={`Show details for ${video.title}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onDetails(video);
+            }}
+            className="glass mt-3 inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+          >
+            <Info className="h-3.5 w-3.5" />
+            Details
+          </button>
         </div>
       </div>
-    </motion.button>
+    </motion.div>
   );
 }
