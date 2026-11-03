@@ -14,6 +14,8 @@ export interface VideoMeta {
   sizeBytes: number;
   /** Duration in seconds, or null when ffprobe could not read it. */
   durationSeconds: number | null;
+  /** Video resolution, such as 720p or 1920x1080, when available. */
+  resolution: string | null;
   /** Streaming endpoint that supports HTTP range requests. */
   streamUrl: string;
   /** Server-generated thumbnail endpoint (null-able on the client is not needed). */

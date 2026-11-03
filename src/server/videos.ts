@@ -23,15 +23,7 @@ import type { VideoMeta, VideosResponse } from "@/lib/types";
 const execFileAsync = promisify(execFile);
 
 /** File extensions treated as playable videos. */
-export const VIDEO_EXTENSIONS = new Set([
-  ".mp4",
-  ".webm",
-  ".avi",
-  ".mov",
-  ".mkv",
-  ".m4v",
-  ".ogv",
-]);
+export const VIDEO_EXTENSIONS = new Set([".mp4", ".webm", ".avi", ".mov", ".mkv", ".m4v", ".ogv"]);
 
 const FFMPEG_BIN = () => process.env["FFMPEG_PATH"] || "ffmpeg";
 const FFPROBE_BIN = () => process.env["FFPROBE_PATH"] || "ffprobe";
@@ -88,9 +80,12 @@ async function probeDuration(filePath: string): Promise<number | null> {
     const { stdout } = await execFileAsync(
       FFPROBE_BIN(),
       [
-        "-v", "error",
-        "-show_entries", "format=duration",
-        "-of", "default=noprint_wrappers=1:nokey=1",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
         filePath,
       ],
       { timeout: 10_000 },
@@ -100,6 +95,60 @@ async function probeDuration(filePath: string): Promise<number | null> {
   } catch {
     return null;
   }
+}
+
+/** Probe the video dimensions with ffprobe; null when unavailable. */
+async function probeResolution(filePath: string): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync(
+      FFPROBE_BIN(),
+      [
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=width,height",
+        "-of",
+        "csv=s=x:p=0",
+        filePath,
+      ],
+      { timeout: 10_000 },
+    );
+    const match = /^(\d+)x(\d+)$/.exec(stdout.trim());
+    if (!match) return null;
+
+    const width = Number(match[1]);
+    const height = Number(match[2]);
+    return height >= 2160
+      ? "4K"
+      : height >= 1440
+        ? "1440p"
+        : height >= 1080
+          ? "1080p"
+          : height >= 720
+            ? "720p"
+            : `${width}x${height}`;
+  } catch {
+    return null;
+  }
+}
+
+/** Clean common release prefixes and trailing resolution tags from a title. */
+export function titleAndFilenameInfo(fileName: string): {
+  title: string;
+  filenameResolution: string | null;
+} {
+  const extension = path.extname(fileName);
+  const baseName = path.basename(fileName, extension);
+  const afterBracket = baseName.includes("]")
+    ? baseName.slice(baseName.indexOf("]") + 1).trim()
+    : baseName.trim();
+  const resolutionMatch = /(?:\(|\[)?(\d{3,4})p?(?:\)|\])?\s*$/i.exec(afterBracket);
+  const filenameResolution = resolutionMatch ? `${resolutionMatch[1]}p` : null;
+  const title = afterBracket.replace(/\s*(?:\(|\[)?\d{3,4}p?(?:\)|\])?\s*$/i, "").trim();
+
+  return { title: title || baseName, filenameResolution };
 }
 
 /**
@@ -116,8 +165,7 @@ export async function getThumbnailPath(fileName: string): Promise<string | null>
   if (!fileStat || !fileStat.isFile()) return null;
 
   const cacheDir =
-    process.env["THUMBNAIL_CACHE_DIR"] ||
-    path.join(tmpdir(), "lumen-video-thumbnails");
+    process.env["THUMBNAIL_CACHE_DIR"] || path.join(tmpdir(), "lumen-video-thumbnails");
   await mkdir(cacheDir, { recursive: true });
 
   const key = createHash("sha1")
@@ -129,19 +177,22 @@ export async function getThumbnailPath(fileName: string): Promise<string | null>
   const duration = await probeDuration(filePath);
   // Grab a representative frame: ~10% in, clamped for very short/long files.
   const seekAt =
-    duration && duration > 4
-      ? Math.min(duration * 0.1, 60)
-      : Math.max((duration ?? 4) * 0.25, 0);
+    duration && duration > 4 ? Math.min(duration * 0.1, 60) : Math.max((duration ?? 4) * 0.25, 0);
 
   try {
     await execFileAsync(
       FFMPEG_BIN(),
       [
-        "-ss", seekAt.toFixed(2),
-        "-i", filePath,
-        "-frames:v", "1",
-        "-vf", "scale=640:-2",
-        "-q:v", "4",
+        "-ss",
+        seekAt.toFixed(2),
+        "-i",
+        filePath,
+        "-frames:v",
+        "1",
+        "-vf",
+        "scale=640:-2",
+        "-q:v",
+        "4",
         "-y",
         outputPath,
       ],
@@ -174,9 +225,7 @@ export async function listVideos(): Promise<VideosResponse> {
   }
 
   const videoFiles = entries.filter(
-    (entry) =>
-      entry.isFile() &&
-      VIDEO_EXTENSIONS.has(path.extname(entry.name).toLowerCase()),
+    (entry) => entry.isFile() && VIDEO_EXTENSIONS.has(path.extname(entry.name).toLowerCase()),
   );
 
   const metas = await Promise.all(
@@ -185,10 +234,10 @@ export async function listVideos(): Promise<VideosResponse> {
       const fileStat = await stat(filePath).catch(() => null);
       if (!fileStat || !fileStat.isFile()) return null; // unreadable → skip
 
-      const extension = path.extname(entry.name);
-      const title = path.basename(entry.name, extension);
+      const { title, filenameResolution } = titleAndFilenameInfo(entry.name);
       const query = `?file=${encodeURIComponent(entry.name)}`;
       const duration = await probeDuration(filePath);
+      const resolution = (await probeResolution(filePath)) ?? filenameResolution;
 
       return {
         id: `${title.toLowerCase().replace(/\s+/g, "-")}-${fileStat.size}`,
@@ -196,6 +245,7 @@ export async function listVideos(): Promise<VideosResponse> {
         fileName: entry.name,
         sizeBytes: fileStat.size,
         durationSeconds: duration,
+        resolution,
         streamUrl: `/api/videos/stream${query}`,
         thumbnailUrl: `/api/videos/thumbnail${query}`,
       };
@@ -209,7 +259,6 @@ export async function listVideos(): Promise<VideosResponse> {
   return {
     videos,
     sourceDir: dir,
-    error:
-      videos.length === 0 ? `No video files found in ${dir}` : null,
+    error: videos.length === 0 ? `No video files found in ${dir}` : null,
   };
 }

@@ -16,6 +16,7 @@ import {
   Play,
   RotateCcw,
   RotateCw,
+  Sparkles,
   Volume1,
   Volume2,
   VolumeX,
@@ -41,12 +42,7 @@ interface VideoPlayerProps {
   autoPlay?: boolean;
 }
 
-export function VideoPlayer({
-  src,
-  title,
-  poster,
-  autoPlay = true,
-}: VideoPlayerProps) {
+export function VideoPlayer({ src, title, poster, autoPlay = true }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
@@ -64,6 +60,7 @@ export function VideoPlayer({
   const [fullscreen, setFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [scrubbing, setScrubbing] = useState(false);
+  const [enhanced, setEnhanced] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   /* Wire media element events to React state. */
@@ -129,11 +126,9 @@ export function VideoPlayer({
 
   /* Keep fullscreen state in sync when the user exits with ESC/system UI. */
   useEffect(() => {
-    const onFullscreenChange = () =>
-      setFullscreen(Boolean(document.fullscreenElement));
+    const onFullscreenChange = () => setFullscreen(Boolean(document.fullscreenElement));
     document.addEventListener("fullscreenchange", onFullscreenChange);
-    return () =>
-      document.removeEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, []);
 
   /* Auto-hide the control bar after 2.5s of inactivity while playing. */
@@ -287,7 +282,14 @@ export function VideoPlayer({
         poster={poster ?? undefined}
         autoPlay={autoPlay}
         playsInline
-        className="h-full w-full object-contain"
+        className="h-full w-full object-contain transition-[filter] duration-300"
+        style={
+          enhanced
+            ? {
+                filter: "brightness(1.06) contrast(1.14) saturate(1.16)",
+              }
+            : undefined
+        }
         onClick={togglePlay}
         onDoubleClick={() => void toggleFullscreen()}
       />
@@ -382,10 +384,7 @@ export function VideoPlayer({
 
               {/* Buttons row */}
               <div className="flex items-center gap-1 text-foreground sm:gap-1.5">
-                <ControlButton
-                  label={playing ? "Pause" : "Play"}
-                  onClick={togglePlay}
-                >
+                <ControlButton label={playing ? "Pause" : "Play"} onClick={togglePlay}>
                   {playing ? (
                     <Pause className="h-5 w-5 fill-current" />
                   ) : (
@@ -423,9 +422,7 @@ export function VideoPlayer({
                     max={1}
                     step={0.05}
                     value={effectiveVolume}
-                    onChange={(event) =>
-                      changeVolume(Number.parseFloat(event.target.value))
-                    }
+                    onChange={(event) => changeVolume(Number.parseFloat(event.target.value))}
                     aria-label="Volume"
                     className="volume-slider w-0 opacity-0 transition-all duration-300 group-hover/vol:w-20 group-hover/vol:opacity-100 focus:w-20 focus:opacity-100 sm:group-hover/vol:w-24"
                   />
@@ -455,15 +452,11 @@ export function VideoPlayer({
                             type="button"
                             onClick={() => applySpeed(value)}
                             className={`flex w-full cursor-pointer items-center justify-between px-3 py-1.5 text-left transition-colors hover:bg-accent ${
-                              speed === value
-                                ? "font-semibold text-primary"
-                                : "text-foreground"
+                              speed === value ? "font-semibold text-primary" : "text-foreground"
                             }`}
                           >
                             <span>{value}×</span>
-                            {speed === value && (
-                              <span className="text-xs text-primary">✓</span>
-                            )}
+                            {speed === value && <span className="text-xs text-primary">✓</span>}
                           </button>
                         ))}
                       </motion.div>
@@ -472,14 +465,18 @@ export function VideoPlayer({
                 </div>
 
                 <ControlButton
+                  label={enhanced ? "Disable quality enhancement" : "Enhance video quality"}
+                  active={enhanced}
+                  onClick={() => setEnhanced((value) => !value)}
+                >
+                  <Sparkles className="h-5 w-5" />
+                </ControlButton>
+
+                <ControlButton
                   label={fullscreen ? "Exit fullscreen" : "Fullscreen"}
                   onClick={() => void toggleFullscreen()}
                 >
-                  {fullscreen ? (
-                    <Minimize className="h-5 w-5" />
-                  ) : (
-                    <Maximize className="h-5 w-5" />
-                  )}
+                  {fullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
                 </ControlButton>
               </div>
             </div>
