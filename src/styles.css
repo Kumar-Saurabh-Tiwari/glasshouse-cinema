@@ -51,26 +51,26 @@
 
 :root {
   --radius: 1rem;
-  /* Soft slate cinema backdrop: lighter than black while retaining contrast. */
-  --background: oklch(0.25 0.024 265);
-  --foreground: oklch(0.97 0.012 260);
-  --card: oklch(0.31 0.028 265);
-  --card-foreground: oklch(0.97 0.012 260);
-  --popover: oklch(0.29 0.028 265);
-  --popover-foreground: oklch(0.97 0.012 260);
+  /* Deep blue-black theatre palette with warm champagne highlights. */
+  --background: oklch(0.18 0.035 265);
+  --foreground: oklch(0.96 0.015 90);
+  --card: oklch(0.23 0.04 265);
+  --card-foreground: oklch(0.96 0.015 90);
+  --popover: oklch(0.21 0.04 265);
+  --popover-foreground: oklch(0.96 0.015 90);
   /* Champagne-gold accent for the premium theatre feel. */
   --primary: oklch(0.82 0.13 82);
   --primary-foreground: oklch(0.2 0.04 80);
-  --secondary: oklch(0.36 0.035 265);
-  --secondary-foreground: oklch(0.97 0.012 260);
-  --muted: oklch(0.35 0.025 265);
-  --muted-foreground: oklch(0.79 0.02 260);
-  --accent: oklch(0.4 0.045 220);
-  --accent-foreground: oklch(0.98 0.012 260);
+  --secondary: oklch(0.29 0.045 265);
+  --secondary-foreground: oklch(0.96 0.015 90);
+  --muted: oklch(0.28 0.035 265);
+  --muted-foreground: oklch(0.72 0.025 265);
+  --accent: oklch(0.34 0.065 235);
+  --accent-foreground: oklch(0.98 0.015 90);
   --destructive: oklch(0.62 0.2 25);
   --destructive-foreground: oklch(0.98 0.01 25);
-  --border: oklch(1 0 0 / 14%);
-  --input: oklch(1 0 0 / 18%);
+  --border: oklch(0.85 0.04 90 / 16%);
+  --input: oklch(1 0 0 / 14%);
   --ring: oklch(0.82 0.13 82);
   --chart-1: oklch(0.82 0.13 82);
   --chart-2: oklch(0.72 0.12 210);
@@ -79,10 +79,10 @@
   --chart-5: oklch(0.7 0.16 40);
 
   /* Glass surface tokens. */
-  --glass-bg: oklch(1 0 0 / 9%);
-  --glass-bg-strong: oklch(0.32 0.025 265 / 84%);
-  --glass-border: oklch(1 0 0 / 17%);
-  --glow-primary: 0 0 40px -8px color-mix(in oklab, var(--primary) 55%, transparent);
+  --glass-bg: oklch(0.98 0.01 90 / 7%);
+  --glass-bg-strong: oklch(0.22 0.04 265 / 88%);
+  --glass-border: oklch(0.88 0.06 90 / 15%);
+  --glow-primary: 0 0 44px -12px color-mix(in oklab, var(--primary) 62%, transparent);
 }
 
 @layer base {
@@ -92,9 +92,10 @@
 
   body {
     background:
-      radial-gradient(900px 520px at 8% -12%, oklch(0.58 0.09 82 / 0.16), transparent 68%),
-      radial-gradient(900px 620px at 100% 0%, oklch(0.55 0.08 220 / 0.18), transparent 70%),
-      linear-gradient(145deg, oklch(0.28 0.025 265), oklch(0.21 0.025 265));
+      radial-gradient(850px 520px at 8% -10%, oklch(0.48 0.12 82 / 0.18), transparent 68%),
+      radial-gradient(900px 620px at 100% 2%, oklch(0.42 0.12 235 / 0.2), transparent 70%),
+      radial-gradient(700px 520px at 50% 110%, oklch(0.3 0.09 330 / 0.13), transparent 72%),
+      linear-gradient(145deg, oklch(0.21 0.04 265), oklch(0.13 0.035 265));
     color: var(--color-foreground);
     font-family: var(--font-sans);
     color-scheme: dark;
@@ -133,13 +134,19 @@
 @utility glass {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
-  backdrop-filter: blur(20px) saturate(150%);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 7%),
+    0 14px 36px -26px oklch(0 0 0 / 85%);
+  backdrop-filter: blur(24px) saturate(155%);
 }
 
 @utility glass-strong {
   background: var(--glass-bg-strong);
-  border: 1px solid oklch(1 0 0 / 16%);
-  backdrop-filter: blur(32px) saturate(160%);
+  border: 1px solid oklch(0.88 0.06 90 / 18%);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 9%),
+    0 24px 60px -30px oklch(0 0 0 / 90%);
+  backdrop-filter: blur(34px) saturate(165%);
 }
 
 /* Bottom gradient scrim under card titles / player controls. */
@@ -160,9 +167,9 @@
 /* Ambient page backdrop: layered theatre-light gradients over the base. */
 @utility ambient-bg {
   background:
-    radial-gradient(1100px 620px at 12% -8%, oklch(0.58 0.09 80 / 0.18), transparent 64%),
-    radial-gradient(900px 700px at 92% 0%, oklch(0.55 0.07 210 / 0.16), transparent 60%),
-    radial-gradient(1000px 900px at 50% 115%, oklch(0.5 0.08 330 / 0.12), transparent 65%),
+    radial-gradient(1100px 620px at 12% -8%, oklch(0.48 0.12 80 / 0.2), transparent 64%),
+    radial-gradient(900px 700px at 92% 0%, oklch(0.42 0.1 220 / 0.2), transparent 60%),
+    radial-gradient(1000px 900px at 50% 115%, oklch(0.36 0.1 330 / 0.14), transparent 65%),
     var(--color-background);
 }
 
@@ -173,8 +180,8 @@
 
 @utility card-glow {
   box-shadow:
-    0 24px 60px -28px oklch(0 0 0 / 75%),
-    inset 0 1px 0 oklch(1 0 0 / 8%);
+    0 28px 70px -32px oklch(0 0 0 / 88%),
+    inset 0 1px 0 oklch(1 0 0 / 9%);
 }
 
 /* Thin styled range input (volume). */

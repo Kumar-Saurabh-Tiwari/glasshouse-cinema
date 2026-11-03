@@ -5,10 +5,12 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { Link } from "@tanstack/react-router";
 import {
   Check,
   FolderOpen,
   Grid2X2,
+  Globe2,
   Info,
   LayoutGrid,
   List,
@@ -228,6 +230,14 @@ export function VideoLibrary() {
                 )}
               </AnimatePresence>
             </div>
+            <Link
+              to="/web"
+              aria-label="Open web viewer"
+              title="Open web viewer"
+              className="glass flex h-10 w-10 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <Globe2 className="h-4 w-4" />
+            </Link>
           </div>
         </div>
 
