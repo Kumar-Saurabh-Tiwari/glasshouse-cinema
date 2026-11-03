@@ -67,7 +67,7 @@ function toVtt(segments: SubtitleSegment[]): string {
     "",
     ...segments.flatMap((segment, index) => [
       String(index + 1),
-      `${formatVttTime(segment.start)} --> ${formatVttTime(segment.end)} line: -20`,
+      `${formatVttTime(segment.start)} --> ${formatVttTime(segment.end)} line: 75%`,
       cleanSubtitleText(segment.text.replace(/\r?\n/g, " ")),
       "",
     ]),

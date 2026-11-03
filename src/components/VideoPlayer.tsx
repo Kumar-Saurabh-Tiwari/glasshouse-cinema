@@ -29,7 +29,7 @@ import {
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 const SUBTITLE_CHUNK_SECONDS = 60;
-const SUBTITLE_CACHE_VERSION = "v9";
+const SUBTITLE_CACHE_VERSION = "v16";
 const PLAYER_SETTINGS_KEY = "lumen-player-settings-v2";
 
 interface PlayerSettings {
@@ -67,6 +67,39 @@ function formatTime(seconds: number): string {
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
+function getActiveSubtitle(chunks: Array<{ text: string }>, current: number): string {
+  for (const chunk of chunks) {
+    const blocks = chunk.text.replace(/^WEBVTT\s*/i, "").trim().split(/\r?\n\r?\n/);
+    for (const block of blocks) {
+      const lines = block.split(/\r?\n/);
+      const timingIndex = lines.findIndex((line) => line.includes("-->"));
+      if (timingIndex < 0) continue;
+      const timing = lines[timingIndex].match(
+        /(\d{2}):(\d{2}):(\d{2})\.(\d{3})\s+-->\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})/,
+      );
+      if (!timing) continue;
+      const start =
+        Number(timing[1]) * 3600 +
+        Number(timing[2]) * 60 +
+        Number(timing[3]) +
+        Number(timing[4]) / 1000;
+      const end =
+        Number(timing[5]) * 3600 +
+        Number(timing[6]) * 60 +
+        Number(timing[7]) +
+        Number(timing[8]) / 1000;
+      if (current >= start && current <= end) {
+        return lines
+          .slice(timingIndex + 1)
+          .join(" ")
+          .replace(/<[^>]+>/g, "")
+          .trim();
+      }
+    }
+  }
+  return "";
+}
+
 interface VideoPlayerProps {
   src: string;
   fileName: string;
@@ -77,7 +110,6 @@ interface VideoPlayerProps {
 
 export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const trackRef = useRef<HTMLTrackElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const hideTimerRef = useRef<number | null>(null);
@@ -101,10 +133,10 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsLoadedRef = useRef(false);
   const [subtitlesEnabled, setSubtitlesEnabled] = useState(false);
-  const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null);
   const [subtitleLoading, setSubtitleLoading] = useState(false);
   const [subtitleSize, setSubtitleSize] = useState(1.25);
   const [subtitleChunks, setSubtitleChunks] = useState<Array<{ start: number; text: string }>>([]);
+  const activeSubtitle = subtitlesEnabled ? getActiveSubtitle(subtitleChunks, current) : "";
   const subtitleCacheKey = `lumen-subtitles-${SUBTITLE_CACHE_VERSION}:${fileName}`;
   const subtitleChunkRef = useRef(0);
   const subtitleLoadedRef = useRef(new Set<number>());
@@ -445,26 +477,6 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
   }, [muted, speed, volume]);
 
   useEffect(() => {
-    if (subtitleChunks.length === 0) return;
-    const vtt = [
-      "WEBVTT",
-      "",
-      ...subtitleChunks.flatMap((chunk) =>
-        chunk.text
-          .replace(/^WEBVTT\s*/i, "")
-          .trim()
-          .split(/\r?\n/),
-      ),
-      "",
-    ].join("\n");
-    const nextUrl = URL.createObjectURL(new Blob([vtt], { type: "text/vtt" }));
-    setSubtitleUrl((previousUrl) => {
-      if (previousUrl) URL.revokeObjectURL(previousUrl);
-      return nextUrl;
-    });
-  }, [subtitleChunks]);
-
-  useEffect(() => {
     try {
       const cached = localStorage.getItem(subtitleCacheKey);
       if (!cached) return;
@@ -511,24 +523,12 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
     }
   }, [current, loadSubtitleChunk, subtitlesEnabled]);
 
-  useEffect(() => {
-    if (trackRef.current) {
-      trackRef.current.track.mode = subtitlesEnabled ? "showing" : "hidden";
-    }
-  }, [subtitlesEnabled, subtitleUrl]);
-
-  useEffect(() => {
-    return () => {
-      if (subtitleUrl) URL.revokeObjectURL(subtitleUrl);
-    };
-  }, [subtitleUrl]);
-
   return (
     <div
       ref={shellRef}
       onPointerMove={bumpControls}
       onPointerDown={bumpControls}
-      className="relative aspect-video w-full overflow-hidden rounded-2xl bg-card select-none"
+      className="video-player-shell relative aspect-video w-full overflow-hidden rounded-2xl bg-card select-none"
     >
       <video
         ref={videoRef}
@@ -555,17 +555,18 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
         onClick={togglePlay}
         onDoubleClick={() => void toggleFullscreen()}
       >
-        {subtitleUrl && (
-          <track
-            ref={trackRef}
-            kind="subtitles"
-            src={subtitleUrl}
-            srcLang="en"
-            label="English"
-            default={subtitlesEnabled}
-          />
-        )}
       </video>
+
+      {activeSubtitle && (
+        <div
+          className={`subtitle-overlay pointer-events-none absolute right-[8%] bottom-[12%] left-[8%] z-10 text-center font-semibold text-foreground ${subtitleSizeClass}`}
+          aria-live="polite"
+        >
+          <span className="inline-block rounded-xl border border-white/20 bg-black/75 px-3 py-1.5 text-[clamp(1.25rem,2.4vw,2rem)] leading-tight text-white shadow-lg">
+            {activeSubtitle}
+          </span>
+        </div>
+      )}
 
       {/* Buffering spinner */}
       {waiting && !error && (
