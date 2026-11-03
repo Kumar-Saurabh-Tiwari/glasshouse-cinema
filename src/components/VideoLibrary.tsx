@@ -26,6 +26,7 @@ import type { VideoMeta, VideosResponse } from "@/lib/types";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { MovieCard } from "@/components/MovieCard";
 import { VideoPlayer } from "@/components/VideoPlayer";
+import { readWatchHistory, type WatchHistoryEntry } from "@/lib/watch-history";
 
 type LibraryView = "grid" | "cards" | "list";
 type LibraryTheme = "dark" | "light";
@@ -47,6 +48,7 @@ export function VideoLibrary() {
   const [defaultSubtitles, setDefaultSubtitles] = useState(false);
   const [defaultEnhancement, setDefaultEnhancement] = useState(false);
   const [defaultUpscaling, setDefaultUpscaling] = useState(false);
+  const [watchHistory, setWatchHistory] = useState<WatchHistoryEntry[]>([]);
 
   useEffect(() => {
     try {
@@ -69,6 +71,17 @@ export function VideoLibrary() {
     } catch {
       // Use defaults when local storage is unavailable or malformed.
     }
+  }, []);
+
+  useEffect(() => {
+    const refreshHistory = () => setWatchHistory(readWatchHistory());
+    refreshHistory();
+    window.addEventListener("storage", refreshHistory);
+    const timer = window.setInterval(refreshHistory, 1000);
+    return () => {
+      window.removeEventListener("storage", refreshHistory);
+      window.clearInterval(timer);
+    };
   }, []);
 
   useEffect(() => {
@@ -175,6 +188,13 @@ export function VideoLibrary() {
   }, [selected]);
 
   const searching = debouncedQuery.length > 0;
+  const historyVideos = watchHistory
+    .map((entry) => ({
+      entry,
+      video: (videos ?? []).find((video) => video.fileName === entry.fileName),
+    }))
+    .filter((item): item is { entry: WatchHistoryEntry; video: VideoMeta } => Boolean(item.video))
+    .slice(0, 4);
 
   return (
     <div className="mx-auto w-full max-w-[1600px] px-4 pb-24 sm:px-6 lg:px-10">
@@ -363,6 +383,37 @@ export function VideoLibrary() {
           </div>
         )}
       </header>
+
+      {historyVideos.length > 0 && !searching && (
+        <section className="mb-8" aria-label="Continue watching">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-display text-lg font-bold text-foreground">Continue watching</h2>
+            <span className="text-xs text-muted-foreground">This session</span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {historyVideos.map(({ entry, video }) => (
+              <button
+                key={video.id}
+                type="button"
+                onClick={() => setSelected(video)}
+                className="glass group overflow-hidden rounded-2xl text-left transition-transform hover:-translate-y-1"
+              >
+                <div className="relative aspect-video">
+                  {video.thumbnailUrl ? (
+                    <img src={video.thumbnailUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="h-full w-full bg-primary/10" />
+                  )}
+                  <span className="absolute right-2 bottom-2 rounded-md bg-black/75 px-2 py-1 text-[11px] font-medium text-white">
+                    {formatDuration(entry.duration - entry.currentTime)} left
+                  </span>
+                </div>
+                <p className="truncate p-3 text-sm font-semibold text-foreground">{video.title}</p>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Grid */}
       {videos === null ? (

@@ -26,6 +26,7 @@ import {
   VolumeX,
   WandSparkles,
 } from "lucide-react";
+import { readWatchHistory, saveWatchProgress } from "@/lib/watch-history";
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 const SUBTITLE_CHUNK_SECONDS = 60;
@@ -69,7 +70,10 @@ function formatTime(seconds: number): string {
 
 function getActiveSubtitle(chunks: Array<{ text: string }>, current: number): string {
   for (const chunk of chunks) {
-    const blocks = chunk.text.replace(/^WEBVTT\s*/i, "").trim().split(/\r?\n\r?\n/);
+    const blocks = chunk.text
+      .replace(/^WEBVTT\s*/i, "")
+      .trim()
+      .split(/\r?\n\r?\n/);
     for (const block of blocks) {
       const lines = block.split(/\r?\n/);
       const timingIndex = lines.findIndex((line) => line.includes("-->"));
@@ -137,6 +141,8 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
   const [subtitleSize, setSubtitleSize] = useState(1.25);
   const [subtitleChunks, setSubtitleChunks] = useState<Array<{ start: number; text: string }>>([]);
   const activeSubtitle = subtitlesEnabled ? getActiveSubtitle(subtitleChunks, current) : "";
+  const [resumePoint, setResumePoint] = useState<number | null>(null);
+  const [resumePromptVisible, setResumePromptVisible] = useState(false);
   const subtitleCacheKey = `lumen-subtitles-${SUBTITLE_CACHE_VERSION}:${fileName}`;
   const subtitleChunkRef = useRef(0);
   const subtitleLoadedRef = useRef(new Set<number>());
@@ -200,8 +206,16 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
       setDuration(video.duration || 0);
       setVolume(video.volume);
       setMuted(video.muted);
+      const saved = readWatchHistory().find((entry) => entry.fileName === fileName);
+      if (saved && saved.currentTime > 10 && saved.currentTime < video.duration - 10) {
+        setResumePoint(saved.currentTime);
+        setResumePromptVisible(true);
+      }
     };
-    const onTime = () => setCurrent(video.currentTime);
+    const onTime = () => {
+      setCurrent(video.currentTime);
+      saveWatchProgress(fileName, video.currentTime, video.duration);
+    };
     const onDuration = () => setDuration(video.duration || 0);
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
@@ -240,7 +254,13 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
       video.removeEventListener("progress", onProgress);
       video.removeEventListener("error", onError);
     };
-  }, [src]);
+  }, [fileName, src]);
+
+  useEffect(() => {
+    if (!resumePromptVisible) return;
+    const timer = window.setTimeout(() => setResumePromptVisible(false), 10_000);
+    return () => window.clearTimeout(timer);
+  }, [resumePromptVisible]);
 
   /* Reset transient state when a different video is loaded. */
   useEffect(() => {
@@ -253,6 +273,8 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
     setSubtitlesEnabled(false);
     setSubtitleLoading(false);
     setSubtitleChunks([]);
+    setResumePoint(null);
+    setResumePromptVisible(false);
     subtitleChunkRef.current = 0;
     subtitleLoadedRef.current.clear();
     subtitleInFlightRef.current.clear();
@@ -554,8 +576,7 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
         }}
         onClick={togglePlay}
         onDoubleClick={() => void toggleFullscreen()}
-      >
-      </video>
+      ></video>
 
       {activeSubtitle && (
         <div
@@ -565,6 +586,33 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
           <span className="inline-block rounded-xl border border-white/20 bg-black/75 px-3 py-1.5 text-[clamp(1.25rem,2.4vw,2rem)] leading-tight text-white shadow-lg">
             {activeSubtitle}
           </span>
+        </div>
+      )}
+
+      {resumePromptVisible && resumePoint !== null && (
+        <div className="absolute top-4 left-1/2 z-20 flex -translate-x-1/2 items-center gap-2 rounded-xl border border-white/15 bg-black/80 p-2 text-sm text-white shadow-xl">
+          <span className="px-1">Continue from {formatTime(resumePoint)}?</span>
+          <button
+            type="button"
+            onClick={() => {
+              const video = videoRef.current;
+              if (video) {
+                video.currentTime = resumePoint;
+                setCurrent(resumePoint);
+              }
+              setResumePromptVisible(false);
+            }}
+            className="rounded-lg bg-primary px-3 py-1.5 font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+          >
+            Continue
+          </button>
+          <button
+            type="button"
+            onClick={() => setResumePromptVisible(false)}
+            className="rounded-lg px-2 py-1.5 text-white/70 hover:bg-white/10 hover:text-white"
+          >
+            Start over
+          </button>
         </div>
       )}
 
