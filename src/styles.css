@@ -51,26 +51,26 @@
 
 :root {
   --radius: 1rem;
-  /* Near-black cinema backdrop with a cool cast. */
-  --background: oklch(0.14 0.018 265);
-  --foreground: oklch(0.95 0.012 260);
-  --card: oklch(0.19 0.022 265);
-  --card-foreground: oklch(0.95 0.012 260);
-  --popover: oklch(0.17 0.022 265);
-  --popover-foreground: oklch(0.95 0.012 260);
+  /* Soft slate cinema backdrop: lighter than black while retaining contrast. */
+  --background: oklch(0.25 0.024 265);
+  --foreground: oklch(0.97 0.012 260);
+  --card: oklch(0.31 0.028 265);
+  --card-foreground: oklch(0.97 0.012 260);
+  --popover: oklch(0.29 0.028 265);
+  --popover-foreground: oklch(0.97 0.012 260);
   /* Champagne-gold accent for the premium theatre feel. */
   --primary: oklch(0.82 0.13 82);
   --primary-foreground: oklch(0.2 0.04 80);
-  --secondary: oklch(0.24 0.03 265);
-  --secondary-foreground: oklch(0.95 0.012 260);
-  --muted: oklch(0.23 0.02 265);
-  --muted-foreground: oklch(0.68 0.02 260);
-  --accent: oklch(0.28 0.04 220);
-  --accent-foreground: oklch(0.95 0.012 260);
+  --secondary: oklch(0.36 0.035 265);
+  --secondary-foreground: oklch(0.97 0.012 260);
+  --muted: oklch(0.35 0.025 265);
+  --muted-foreground: oklch(0.79 0.02 260);
+  --accent: oklch(0.4 0.045 220);
+  --accent-foreground: oklch(0.98 0.012 260);
   --destructive: oklch(0.62 0.2 25);
   --destructive-foreground: oklch(0.98 0.01 25);
-  --border: oklch(1 0 0 / 9%);
-  --input: oklch(1 0 0 / 12%);
+  --border: oklch(1 0 0 / 14%);
+  --input: oklch(1 0 0 / 18%);
   --ring: oklch(0.82 0.13 82);
   --chart-1: oklch(0.82 0.13 82);
   --chart-2: oklch(0.72 0.12 210);
@@ -79,9 +79,9 @@
   --chart-5: oklch(0.7 0.16 40);
 
   /* Glass surface tokens. */
-  --glass-bg: oklch(1 0 0 / 6%);
-  --glass-bg-strong: oklch(0.2 0.02 265 / 72%);
-  --glass-border: oklch(1 0 0 / 12%);
+  --glass-bg: oklch(1 0 0 / 9%);
+  --glass-bg-strong: oklch(0.32 0.025 265 / 84%);
+  --glass-border: oklch(1 0 0 / 17%);
   --glow-primary: 0 0 40px -8px color-mix(in oklab, var(--primary) 55%, transparent);
 }
 
@@ -91,7 +91,10 @@
   }
 
   body {
-    background-color: var(--color-background);
+    background:
+      radial-gradient(900px 520px at 8% -12%, oklch(0.58 0.09 82 / 0.16), transparent 68%),
+      radial-gradient(900px 620px at 100% 0%, oklch(0.55 0.08 220 / 0.18), transparent 70%),
+      linear-gradient(145deg, oklch(0.28 0.025 265), oklch(0.21 0.025 265));
     color: var(--color-foreground);
     font-family: var(--font-sans);
     color-scheme: dark;
@@ -157,9 +160,9 @@
 /* Ambient page backdrop: layered theatre-light gradients over the base. */
 @utility ambient-bg {
   background:
-    radial-gradient(1100px 620px at 12% -8%, oklch(0.4 0.09 80 / 0.22), transparent 60%),
-    radial-gradient(900px 700px at 92% 0%, oklch(0.35 0.07 210 / 0.2), transparent 55%),
-    radial-gradient(1000px 900px at 50% 115%, oklch(0.35 0.08 330 / 0.16), transparent 60%),
+    radial-gradient(1100px 620px at 12% -8%, oklch(0.58 0.09 80 / 0.18), transparent 64%),
+    radial-gradient(900px 700px at 92% 0%, oklch(0.55 0.07 210 / 0.16), transparent 60%),
+    radial-gradient(1000px 900px at 50% 115%, oklch(0.5 0.08 330 / 0.12), transparent 65%),
     var(--color-background);
 }
 
