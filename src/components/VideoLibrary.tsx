@@ -5,12 +5,28 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { FolderOpen, Info, Search, SlidersHorizontal, TriangleAlert, X } from "lucide-react";
+import {
+  Check,
+  FolderOpen,
+  Grid2X2,
+  Info,
+  LayoutGrid,
+  List,
+  Search,
+  Settings2,
+  SlidersHorizontal,
+  TriangleAlert,
+  X,
+} from "lucide-react";
 
 import type { VideoMeta, VideosResponse } from "@/lib/types";
 import { formatBytes, formatDuration } from "@/lib/format";
 import { MovieCard } from "@/components/MovieCard";
 import { VideoPlayer } from "@/components/VideoPlayer";
+
+type LibraryView = "grid" | "cards" | "list";
+const LIBRARY_SETTINGS_KEY = "lumen-library-settings";
+const PLAYER_SETTINGS_KEY = "lumen-player-settings-v2";
 
 export function VideoLibrary() {
   const [videos, setVideos] = useState<VideoMeta[] | null>(null);
@@ -21,6 +37,57 @@ export function VideoLibrary() {
   const [resolutionFilter, setResolutionFilter] = useState("all");
   const [selected, setSelected] = useState<VideoMeta | null>(null);
   const [detailsVideo, setDetailsVideo] = useState<VideoMeta | null>(null);
+  const [view, setView] = useState<LibraryView>("grid");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [defaultSubtitles, setDefaultSubtitles] = useState(false);
+  const [defaultEnhancement, setDefaultEnhancement] = useState(false);
+  const [defaultUpscaling, setDefaultUpscaling] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(LIBRARY_SETTINGS_KEY) ?? "{}") as {
+        view?: LibraryView;
+      };
+      if (saved.view === "grid" || saved.view === "cards" || saved.view === "list") {
+        setView(saved.view);
+      }
+      const player = JSON.parse(localStorage.getItem(PLAYER_SETTINGS_KEY) ?? "{}") as {
+        subtitlesEnabled?: boolean;
+        enhanced?: boolean;
+        upscaled?: boolean;
+      };
+      setDefaultSubtitles(Boolean(player.subtitlesEnabled));
+      setDefaultEnhancement(Boolean(player.enhanced));
+      setDefaultUpscaling(Boolean(player.upscaled));
+    } catch {
+      // Use defaults when local storage is unavailable or malformed.
+    }
+  }, []);
+
+  const saveLibraryView = (nextView: LibraryView) => {
+    setView(nextView);
+    try {
+      localStorage.setItem(LIBRARY_SETTINGS_KEY, JSON.stringify({ view: nextView }));
+    } catch {
+      // Preferences remain active for this session.
+    }
+  };
+
+  const savePlayerDefaults = (changes: Record<string, boolean>) => {
+    try {
+      const current = JSON.parse(localStorage.getItem(PLAYER_SETTINGS_KEY) ?? "{}");
+      localStorage.setItem(PLAYER_SETTINGS_KEY, JSON.stringify({ ...current, ...changes }));
+    } catch {
+      // Preferences remain active for this session.
+    }
+  };
+
+  const updateDefault = (key: "subtitlesEnabled" | "enhanced" | "upscaled", value: boolean) => {
+    if (key === "subtitlesEnabled") setDefaultSubtitles(value);
+    if (key === "enhanced") setDefaultEnhancement(value);
+    if (key === "upscaled") setDefaultUpscaling(value);
+    savePlayerDefaults({ [key]: value });
+  };
 
   /* Load the library once on mount. */
   useEffect(() => {
@@ -84,7 +151,7 @@ export function VideoLibrary() {
   return (
     <div className="mx-auto w-full max-w-[1600px] px-4 pb-24 sm:px-6 lg:px-10">
       {/* Compact sticky library header */}
-      <header className="sticky top-0 z-30 -mx-4 mb-8 border-b border-white/5 bg-background/85 px-4 py-3 backdrop-blur-2xl sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10">
+      <header className="sticky top-0 z-30 -mx-4 mb-8 border-b border-white/10 bg-background/75 px-4 py-4 shadow-[0_16px_40px_-28px_oklch(0_0_0/90%)] backdrop-blur-2xl sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10">
         <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div>
@@ -104,15 +171,67 @@ export function VideoLibrary() {
               </div>
             )}
           </div>
-          {sourceDir && !loadError && (
-            <p className="hidden items-center gap-2 text-xs text-muted-foreground/70 lg:flex">
-              <FolderOpen className="h-3.5 w-3.5" />
-              {sourceDir}
-            </p>
-          )}
+          <div className="flex items-center gap-2">
+            {sourceDir && !loadError && (
+              <p className="hidden items-center gap-2 text-xs text-muted-foreground/70 lg:flex">
+                <FolderOpen className="h-3.5 w-3.5" />
+                {sourceDir}
+              </p>
+            )}
+            <div className="relative">
+              <button
+                type="button"
+                aria-label="Open library settings"
+                onClick={() => setSettingsOpen((open) => !open)}
+                className={`glass flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl transition-colors hover:bg-accent ${settingsOpen ? "text-primary" : "text-muted-foreground"}`}
+              >
+                <Settings2 className="h-4 w-4" />
+              </button>
+              <AnimatePresence>
+                {settingsOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                    className="glass-strong absolute top-12 right-0 z-40 w-72 rounded-2xl p-4 shadow-2xl"
+                  >
+                    <p className="font-display text-sm font-semibold text-foreground">
+                      Default settings
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">Saved for your next video.</p>
+                    <div className="mt-4 space-y-3 text-sm">
+                      {[
+                        ["Subtitles", defaultSubtitles, "subtitlesEnabled"],
+                        ["Quality enhancement", defaultEnhancement, "enhanced"],
+                        ["Upscaling", defaultUpscaling, "upscaled"],
+                      ].map(([label, checked, key]) => (
+                        <label
+                          key={key as string}
+                          className="flex cursor-pointer items-center justify-between gap-3 text-muted-foreground"
+                        >
+                          <span>{label as string}</span>
+                          <input
+                            type="checkbox"
+                            checked={checked as boolean}
+                            onChange={(event) =>
+                              updateDefault(
+                                key as "subtitlesEnabled" | "enhanced" | "upscaled",
+                                event.target.checked,
+                              )
+                            }
+                            className="accent-primary"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
         </div>
 
-        <div className="mx-auto mt-3 flex max-w-[1600px] flex-col gap-2 sm:flex-row">
+        <div className="mx-auto mt-4 flex max-w-[1600px] flex-col gap-2 sm:flex-row">
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -151,6 +270,26 @@ export function VideoLibrary() {
               ))}
             </select>
           </label>
+          <div className="glass flex h-11 shrink-0 items-center gap-1 rounded-xl p-1">
+            {(
+              [
+                ["grid", LayoutGrid, "Grid view"],
+                ["cards", Grid2X2, "Card view"],
+                ["list", List, "List view"],
+              ] as const
+            ).map(([value, Icon, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-label={label}
+                title={label}
+                onClick={() => saveLibraryView(value)}
+                className={`flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg transition-colors ${view === value ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}
+              >
+                <Icon className="h-4 w-4" />
+              </button>
+            ))}
+          </div>
         </div>
 
         {loadError && videos && videos.length === 0 && (
@@ -173,7 +312,13 @@ export function VideoLibrary() {
       ) : filtered.length > 0 ? (
         <motion.div
           layout
-          className="grid grid-cols-1 gap-7 sm:grid-cols-2 sm:gap-8 xl:grid-cols-3 xl:gap-9"
+          className={
+            view === "list"
+              ? "grid grid-cols-1 gap-4"
+              : view === "cards"
+                ? "grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                : "grid grid-cols-1 gap-7 sm:grid-cols-2 sm:gap-8 xl:grid-cols-3 xl:gap-9"
+          }
         >
           <AnimatePresence mode="popLayout">
             {filtered.map((video) => (
@@ -182,6 +327,7 @@ export function VideoLibrary() {
                 video={video}
                 onSelect={setSelected}
                 onDetails={setDetailsVideo}
+                view={view}
               />
             ))}
           </AnimatePresence>

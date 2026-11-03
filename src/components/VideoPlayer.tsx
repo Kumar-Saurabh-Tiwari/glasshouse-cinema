@@ -29,8 +29,8 @@ import {
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 const SUBTITLE_CHUNK_SECONDS = 60;
-const SUBTITLE_CACHE_VERSION = "v8";
-const PLAYER_SETTINGS_KEY = "lumen-player-settings";
+const SUBTITLE_CACHE_VERSION = "v9";
+const PLAYER_SETTINGS_KEY = "lumen-player-settings-v2";
 
 interface PlayerSettings {
   enhanced: boolean;
@@ -50,7 +50,7 @@ const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
   enhancementIntensity: 60,
   upscaleIntensity: 60,
   subtitlesEnabled: false,
-  subtitleSize: 1.1,
+  subtitleSize: 1.25,
   volume: 1,
   muted: false,
   speed: 1,
@@ -103,7 +103,7 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
   const [subtitlesEnabled, setSubtitlesEnabled] = useState(false);
   const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null);
   const [subtitleLoading, setSubtitleLoading] = useState(false);
-  const [subtitleSize, setSubtitleSize] = useState(1.1);
+  const [subtitleSize, setSubtitleSize] = useState(1.25);
   const [subtitleChunks, setSubtitleChunks] = useState<Array<{ start: number; text: string }>>([]);
   const subtitleCacheKey = `lumen-subtitles-${SUBTITLE_CACHE_VERSION}:${fileName}`;
   const subtitleChunkRef = useRef(0);
@@ -373,7 +373,7 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
   const subtitleSizeClass =
     subtitleSize < 1
       ? "subtitle-size-small"
-      : subtitleSize > 1.2
+      : subtitleSize > 1.35
         ? "subtitle-size-large"
         : "subtitle-size-medium";
 

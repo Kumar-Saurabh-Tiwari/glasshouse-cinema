@@ -9,7 +9,7 @@ import { safeResolveVideoPath } from "@/server/videos";
 
 const execFileAsync = promisify(execFile);
 const subtitleJobs = new Map<string, Promise<string>>();
-const SUBTITLE_CACHE_VERSION = "v8";
+const SUBTITLE_CACHE_VERSION = "v9";
 
 interface SubtitleSegment {
   start: number;
@@ -67,7 +67,7 @@ function toVtt(segments: SubtitleSegment[]): string {
     "",
     ...segments.flatMap((segment, index) => [
       String(index + 1),
-      `${formatVttTime(segment.start)} --> ${formatVttTime(segment.end)} line: -5`,
+      `${formatVttTime(segment.start)} --> ${formatVttTime(segment.end)} line: -20`,
       cleanSubtitleText(segment.text.replace(/\r?\n/g, " ")),
       "",
     ]),

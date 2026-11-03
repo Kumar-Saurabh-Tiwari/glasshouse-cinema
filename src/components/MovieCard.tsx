@@ -14,9 +14,10 @@ interface MovieCardProps {
   video: VideoMeta;
   onSelect: (video: VideoMeta) => void;
   onDetails: (video: VideoMeta) => void;
+  view?: "grid" | "cards" | "list";
 }
 
-export function MovieCard({ video, onSelect, onDetails }: MovieCardProps) {
+export function MovieCard({ video, onSelect, onDetails, view = "grid" }: MovieCardProps) {
   const [thumbFailed, setThumbFailed] = useState(false);
   const [generatedThumb, setGeneratedThumb] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
@@ -100,9 +101,17 @@ export function MovieCard({ video, onSelect, onDetails }: MovieCardProps) {
       }}
       onMouseEnter={startPreview}
       onMouseLeave={stopPreview}
-      className="glass card-glow group relative block w-full cursor-pointer overflow-hidden rounded-3xl border-white/5 text-left transition-[border-color,box-shadow] duration-300 hover:border-primary/25 hover:shadow-[0_30px_70px_-30px_oklch(0_0_0/80%),var(--glow-primary)] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      className={`glass card-glow group relative block w-full cursor-pointer overflow-hidden rounded-3xl border-white/5 text-left transition-[border-color,box-shadow] duration-300 hover:border-primary/25 hover:shadow-[0_30px_70px_-30px_oklch(0_0_0/80%),var(--glow-primary)] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${view === "list" ? "flex flex-col sm:flex-row sm:items-stretch" : ""}`}
     >
-      <div className="relative aspect-[16/10] overflow-hidden">
+      <div
+        className={`relative overflow-hidden ${
+          view === "list"
+            ? "aspect-video shrink-0 sm:aspect-auto sm:min-h-64 sm:w-[min(42%,32rem)]"
+            : view === "cards"
+              ? "aspect-[16/11]"
+              : "aspect-[16/10]"
+        }`}
+      >
         {thumbnailUrl ? (
           <img
             src={thumbnailUrl}
@@ -160,7 +169,9 @@ export function MovieCard({ video, onSelect, onDetails }: MovieCardProps) {
         </div>
 
         {/* Title block */}
-        <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
+        <div
+          className={`absolute inset-x-0 bottom-0 p-4 sm:p-5 ${view === "list" ? "hidden" : ""}`}
+        >
           <h3
             title={video.title}
             className="font-display line-clamp-2 min-h-[3.5rem] text-lg font-semibold tracking-tight text-foreground sm:text-xl"
@@ -184,6 +195,41 @@ export function MovieCard({ video, onSelect, onDetails }: MovieCardProps) {
           </button>
         </div>
       </div>
+      {view === "list" && (
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-3 p-5 sm:p-7">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h3
+                title={video.title}
+                className="font-display line-clamp-2 text-xl font-semibold tracking-tight text-foreground sm:text-2xl"
+              >
+                {video.title}
+              </h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {video.resolution ?? "Resolution unavailable"}
+              </p>
+            </div>
+            <span className="glass shrink-0 rounded-full px-3 py-1 text-xs text-muted-foreground">
+              {formatDuration(video.durationSeconds)}
+            </span>
+          </div>
+          <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+            Ready to play in the Lumen cinema library.
+          </p>
+          <button
+            type="button"
+            aria-label={`Show details for ${video.title}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onDetails(video);
+            }}
+            className="glass inline-flex h-9 w-fit items-center gap-1.5 rounded-full px-4 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+          >
+            <Info className="h-3.5 w-3.5" />
+            Details
+          </button>
+        </div>
+      )}
     </motion.div>
   );
 }

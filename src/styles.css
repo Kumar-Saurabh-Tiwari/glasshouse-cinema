@@ -106,22 +106,22 @@
     border: 1px solid oklch(1 0 0 / 18%);
     border-radius: 0.6rem;
     color: oklch(0.98 0.01 260);
-    font-size: 1rem;
+    font-size: 1.15rem;
     line-height: 1.25;
     padding: 0.3rem 0.7rem;
     text-shadow: 0 1px 3px oklch(0 0 0 / 80%);
   }
 
   video.subtitle-size-small::cue {
-    font-size: 0.85rem;
+    font-size: 1rem;
   }
 
   video.subtitle-size-medium::cue {
-    font-size: 1.1rem;
+    font-size: 1.25rem;
   }
 
   video.subtitle-size-large::cue {
-    font-size: 1.3rem;
+    font-size: 1.5rem;
   }
 }
 
