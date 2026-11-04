@@ -9,7 +9,7 @@ export const WATCH_HISTORY_KEY = "lumen-watch-history-v1";
 
 export function readWatchHistory(): WatchHistoryEntry[] {
   try {
-    const parsed = JSON.parse(sessionStorage.getItem(WATCH_HISTORY_KEY) ?? "[]") as unknown;
+    const parsed = JSON.parse(localStorage.getItem(WATCH_HISTORY_KEY) ?? "[]") as unknown;
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(isWatchHistoryEntry).sort((a, b) => b.lastWatched - a.lastWatched);
   } catch {
@@ -22,26 +22,26 @@ export function saveWatchProgress(fileName: string, currentTime: number, duratio
   const history = readWatchHistory().filter((entry) => entry.fileName !== fileName);
   if (currentTime >= duration - 10) {
     try {
-      sessionStorage.setItem(WATCH_HISTORY_KEY, JSON.stringify(history));
+      localStorage.setItem(WATCH_HISTORY_KEY, JSON.stringify(history));
     } catch {
-      // Session history is best effort when browser storage is unavailable.
+      // History is best effort when browser storage is unavailable.
     }
     return;
   }
   history.unshift({ fileName, currentTime, duration, lastWatched: Date.now() });
   try {
-    sessionStorage.setItem(WATCH_HISTORY_KEY, JSON.stringify(history.slice(0, 12)));
+    localStorage.setItem(WATCH_HISTORY_KEY, JSON.stringify(history.slice(0, 12)));
   } catch {
-    // Session history is best effort when browser storage is unavailable.
+    // History is best effort when browser storage is unavailable.
   }
 }
 
 export function removeWatchHistory(fileName: string): void {
   const history = readWatchHistory().filter((entry) => entry.fileName !== fileName);
   try {
-    sessionStorage.setItem(WATCH_HISTORY_KEY, JSON.stringify(history));
+    localStorage.setItem(WATCH_HISTORY_KEY, JSON.stringify(history));
   } catch {
-    // Session history is best effort when browser storage is unavailable.
+    // History is best effort when browser storage is unavailable.
   }
 }
 
