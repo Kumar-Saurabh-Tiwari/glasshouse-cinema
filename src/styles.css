@@ -5,7 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Design system — "Lumen", a dark cinematic glass theme.
+ * Design system — "Lumen", a punchy black cinematic glass theme.
  *
  * The @theme inline block maps CSS custom properties to Tailwind utilities
  * (e.g. --color-primary -> bg-primary, text-primary). All colors are oklch.
@@ -51,37 +51,37 @@
 
 :root {
   --radius: 1rem;
-  /* Deep blue-black theatre palette with warm champagne highlights. */
-  --background: oklch(0.18 0.035 265);
+  /* Near-black theatre palette with warm champagne highlights. */
+  --background: oklch(0.055 0.01 265);
   --foreground: oklch(0.96 0.015 90);
-  --card: oklch(0.23 0.04 265);
+  --card: oklch(0.095 0.015 265);
   --card-foreground: oklch(0.96 0.015 90);
-  --popover: oklch(0.21 0.04 265);
+  --popover: oklch(0.085 0.015 265);
   --popover-foreground: oklch(0.96 0.015 90);
-  /* Champagne-gold accent for the premium theatre feel. */
-  --primary: oklch(0.82 0.13 82);
-  --primary-foreground: oklch(0.2 0.04 80);
-  --secondary: oklch(0.29 0.045 265);
+  /* Brighter champagne-gold accent for crisp contrast against black. */
+  --primary: oklch(0.86 0.16 82);
+  --primary-foreground: oklch(0.12 0.025 80);
+  --secondary: oklch(0.15 0.025 265);
   --secondary-foreground: oklch(0.96 0.015 90);
-  --muted: oklch(0.28 0.035 265);
+  --muted: oklch(0.14 0.02 265);
   --muted-foreground: oklch(0.72 0.025 265);
-  --accent: oklch(0.34 0.065 235);
+  --accent: oklch(0.22 0.075 235);
   --accent-foreground: oklch(0.98 0.015 90);
   --destructive: oklch(0.62 0.2 25);
   --destructive-foreground: oklch(0.98 0.01 25);
-  --border: oklch(0.85 0.04 90 / 16%);
-  --input: oklch(1 0 0 / 14%);
-  --ring: oklch(0.82 0.13 82);
-  --chart-1: oklch(0.82 0.13 82);
+  --border: oklch(0.85 0.04 90 / 20%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.86 0.16 82);
+  --chart-1: oklch(0.86 0.16 82);
   --chart-2: oklch(0.72 0.12 210);
   --chart-3: oklch(0.65 0.15 330);
   --chart-4: oklch(0.75 0.14 140);
   --chart-5: oklch(0.7 0.16 40);
 
   /* Glass surface tokens. */
-  --glass-bg: oklch(0.98 0.01 90 / 7%);
-  --glass-bg-strong: oklch(0.22 0.04 265 / 88%);
-  --glass-border: oklch(0.88 0.06 90 / 15%);
+  --glass-bg: oklch(0.98 0.01 90 / 5%);
+  --glass-bg-strong: oklch(0.11 0.02 265 / 94%);
+  --glass-border: oklch(0.88 0.06 90 / 18%);
   --glow-primary: 0 0 44px -12px color-mix(in oklab, var(--primary) 62%, transparent);
 }
 
@@ -116,10 +116,10 @@ html.light {
 
   body {
     background:
-      radial-gradient(850px 520px at 8% -10%, oklch(0.48 0.12 82 / 0.18), transparent 68%),
-      radial-gradient(900px 620px at 100% 2%, oklch(0.42 0.12 235 / 0.2), transparent 70%),
-      radial-gradient(700px 520px at 50% 110%, oklch(0.3 0.09 330 / 0.13), transparent 72%),
-      linear-gradient(145deg, oklch(0.21 0.04 265), oklch(0.13 0.035 265));
+      radial-gradient(850px 520px at 8% -10%, oklch(0.5 0.16 82 / 0.2), transparent 68%),
+      radial-gradient(900px 620px at 100% 2%, oklch(0.42 0.15 235 / 0.18), transparent 70%),
+      radial-gradient(700px 520px at 50% 110%, oklch(0.3 0.12 330 / 0.1), transparent 72%),
+      linear-gradient(145deg, oklch(0.08 0.015 265), oklch(0.025 0.005 265));
     color: var(--color-foreground);
     font-family: var(--font-sans);
     color-scheme: dark;
@@ -152,7 +152,7 @@ html.light {
   }
 
   video::cue {
-    background: oklch(0.12 0.02 265 / 78%);
+    background: oklch(0.015 0.005 265 / 88%);
     border: 1px solid oklch(1 0 0 / 18%);
     border-radius: 0.6rem;
     color: oklch(0.98 0.01 260);
@@ -203,23 +203,23 @@ html.light {
 @utility scrim {
   background: linear-gradient(
     to top,
-    oklch(0.05 0.01 265 / 85%) 0%,
-    oklch(0.05 0.01 265 / 35%) 45%,
+    oklch(0.01 0.003 265 / 92%) 0%,
+    oklch(0.01 0.003 265 / 42%) 45%,
     transparent 100%
   );
 }
 
 /* Full-screen modal dimmer. */
 @utility overlay-scrim {
-  background: oklch(0.05 0.01 265 / 72%);
+  background: oklch(0.01 0.003 265 / 82%);
 }
 
 /* Ambient page backdrop: layered theatre-light gradients over the base. */
 @utility ambient-bg {
   background:
-    radial-gradient(1100px 620px at 12% -8%, oklch(0.48 0.12 80 / 0.2), transparent 64%),
-    radial-gradient(900px 700px at 92% 0%, oklch(0.42 0.1 220 / 0.2), transparent 60%),
-    radial-gradient(1000px 900px at 50% 115%, oklch(0.36 0.1 330 / 0.14), transparent 65%),
+    radial-gradient(1100px 620px at 12% -8%, oklch(0.5 0.16 80 / 0.22), transparent 64%),
+    radial-gradient(900px 700px at 92% 0%, oklch(0.42 0.14 220 / 0.2), transparent 60%),
+    radial-gradient(1000px 900px at 50% 115%, oklch(0.36 0.12 330 / 0.12), transparent 65%),
     var(--color-background);
 }
 
