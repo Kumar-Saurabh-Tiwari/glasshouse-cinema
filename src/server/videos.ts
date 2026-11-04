@@ -46,8 +46,8 @@ function isFfmpegAvailable(): Promise<boolean> {
  * Examples: VIDEOS_DIRECTORY=C:\Users\Saurabh\Videos\UXU (Windows)
  *           VIDEOS_DIRECTORY=/Users/saurabh/Videos (macOS)
  */
-export function getVideosDirectory(): string {
-  const configured = process.env["VIDEOS_DIRECTORY"];
+export function getVideosDirectory(override?: string): string {
+  const configured = override?.trim() || process.env["VIDEOS_DIRECTORY"];
   if (configured && configured.trim().length > 0) {
     return path.resolve(configured.trim());
   }
@@ -79,8 +79,8 @@ export function contentTypeFor(extension: string): string {
  * Safely resolve a user-supplied filename inside the videos folder.
  * Returns null when the path escapes the folder (path traversal attempt).
  */
-export function safeResolveVideoPath(fileName: string): string | null {
-  const dir = getVideosDirectory();
+export function safeResolveVideoPath(fileName: string, directory?: string): string | null {
+  const dir = getVideosDirectory(directory);
   const resolved = path.resolve(dir, fileName);
   if (resolved !== dir && !resolved.startsWith(dir + path.sep)) return null;
   return resolved;
@@ -169,8 +169,11 @@ export function titleAndFilenameInfo(fileName: string): {
  * file size + mtime so edited videos get fresh thumbnails automatically.
  * Returns the absolute path of the cached JPEG, or null on failure.
  */
-export async function getThumbnailPath(fileName: string): Promise<string | null> {
-  const filePath = safeResolveVideoPath(fileName);
+export async function getThumbnailPath(
+  fileName: string,
+  directory?: string,
+): Promise<string | null> {
+  const filePath = safeResolveVideoPath(fileName, directory);
   if (!filePath) return null;
 
   const fileStat = await stat(filePath).catch(() => null);
@@ -221,8 +224,8 @@ export async function getThumbnailPath(fileName: string): Promise<string | null>
  * Never throws: unreadable folders and unreadable files are reported as
  * data (error string / skipped entry) so the UI can show a friendly state.
  */
-export async function listVideos(): Promise<VideosResponse> {
-  const dir = getVideosDirectory();
+export async function listVideos(directory?: string): Promise<VideosResponse> {
+  const dir = getVideosDirectory(directory);
   const thumbnailsAvailable = await isFfmpegAvailable();
 
   let entries;
@@ -248,7 +251,7 @@ export async function listVideos(): Promise<VideosResponse> {
       if (!fileStat || !fileStat.isFile()) return null; // unreadable → skip
 
       const { title, filenameResolution } = titleAndFilenameInfo(entry.name);
-      const query = `?file=${encodeURIComponent(entry.name)}`;
+      const query = `?file=${encodeURIComponent(entry.name)}${directory ? `&path=${encodeURIComponent(dir)}` : ""}`;
       const duration = await probeDuration(filePath);
       const resolution = (await probeResolution(filePath)) ?? filenameResolution;
 

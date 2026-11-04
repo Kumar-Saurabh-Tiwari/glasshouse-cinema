@@ -17,11 +17,12 @@ export const Route = createFileRoute("/api/videos/stream")({
     handlers: {
       GET: async ({ request }) => {
         const fileName = new URL(request.url).searchParams.get("file");
+        const directory = new URL(request.url).searchParams.get("path") ?? undefined;
         if (!fileName) {
           return new Response("Missing `file` query parameter", { status: 400 });
         }
 
-        const filePath = safeResolveVideoPath(fileName);
+        const filePath = safeResolveVideoPath(fileName, directory);
         if (!filePath) {
           return new Response("Invalid file path", { status: 400 });
         }

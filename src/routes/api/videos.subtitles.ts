@@ -6,7 +6,9 @@ export const Route = createFileRoute("/api/videos/subtitles")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const fileName = new URL(request.url).searchParams.get("file");
+        const url = new URL(request.url);
+        const fileName = url.searchParams.get("file");
+        const directory = url.searchParams.get("path") ?? undefined;
         if (!fileName) {
           return new Response("Missing `file` query parameter", { status: 400 });
         }
@@ -23,7 +25,7 @@ export const Route = createFileRoute("/api/videos/subtitles")({
         );
 
         try {
-          const vtt = await readSubtitleFile(fileName, start, duration);
+          const vtt = await readSubtitleFile(fileName, start, duration, directory);
           return new Response(vtt, {
             headers: {
               "Content-Type": "text/vtt; charset=utf-8",

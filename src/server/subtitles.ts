@@ -304,8 +304,13 @@ async function generateWithLocalWhisper(
   return cachePath;
 }
 
-export async function getSubtitlePath(fileName: string, start = 0, duration = 60): Promise<string> {
-  const filePath = safeResolveVideoPath(fileName);
+export async function getSubtitlePath(
+  fileName: string,
+  start = 0,
+  duration = 60,
+  directory?: string,
+): Promise<string> {
+  const filePath = safeResolveVideoPath(fileName, directory);
   if (!filePath) throw new Error("Invalid video file path");
 
   const fileStat = await stat(filePath).catch(() => null);
@@ -338,6 +343,7 @@ export async function readSubtitleFile(
   fileName: string,
   start = 0,
   duration = 60,
+  directory?: string,
 ): Promise<string> {
-  return readFile(await getSubtitlePath(fileName, start, duration), "utf8");
+  return readFile(await getSubtitlePath(fileName, start, duration, directory), "utf8");
 }

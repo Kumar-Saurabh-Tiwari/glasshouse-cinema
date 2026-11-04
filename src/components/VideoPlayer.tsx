@@ -439,7 +439,7 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
       subtitleInFlightRef.current.add(start);
       try {
         const response = await fetch(
-          `/api/videos/subtitles?file=${encodeURIComponent(fileName)}&start=${Math.floor(start)}&duration=${SUBTITLE_CHUNK_SECONDS}`,
+          `/api/videos/subtitles?file=${encodeURIComponent(fileName)}&path=${encodeURIComponent(new URL(src, window.location.origin).searchParams.get("path") ?? "")}&start=${Math.floor(start)}&duration=${SUBTITLE_CHUNK_SECONDS}`,
         );
         if (!response.ok) throw new Error(await response.text());
         const text = await response.text();

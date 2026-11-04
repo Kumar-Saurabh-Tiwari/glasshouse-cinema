@@ -14,11 +14,12 @@ export const Route = createFileRoute("/api/videos/thumbnail")({
     handlers: {
       GET: async ({ request }) => {
         const fileName = new URL(request.url).searchParams.get("file");
+        const directory = new URL(request.url).searchParams.get("path") ?? undefined;
         if (!fileName) {
           return new Response("Missing `file` query parameter", { status: 400 });
         }
 
-        const thumbnailPath = await getThumbnailPath(fileName);
+        const thumbnailPath = await getThumbnailPath(fileName, directory);
         if (!thumbnailPath) {
           return new Response("Thumbnail unavailable for this file", {
             status: 404,

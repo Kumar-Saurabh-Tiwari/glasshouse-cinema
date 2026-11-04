@@ -10,9 +10,10 @@ import { listVideos } from "@/server/videos";
 export const Route = createFileRoute("/api/videos")({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
         try {
-          const result = await listVideos();
+          const directory = new URL(request.url).searchParams.get("path") ?? undefined;
+          const result = await listVideos(directory);
           return Response.json(result);
         } catch (err) {
           console.error("[api/videos] failed to list videos:", err);

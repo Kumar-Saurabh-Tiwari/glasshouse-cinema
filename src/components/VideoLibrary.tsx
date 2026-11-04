@@ -31,12 +31,16 @@ import { readWatchHistory, removeWatchHistory, type WatchHistoryEntry } from "@/
 type LibraryView = "grid" | "cards" | "list";
 type LibraryTheme = "dark" | "light";
 const LIBRARY_SETTINGS_KEY = "lumen-library-settings";
+const PATH_HISTORY_KEY = "lumen-video-path-history";
 const PLAYER_SETTINGS_KEY = "lumen-player-settings-v2";
 
 export function VideoLibrary() {
   const [videos, setVideos] = useState<VideoMeta[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sourceDir, setSourceDir] = useState("");
+  const [pathInput, setPathInput] = useState("");
+  const [pathHistory, setPathHistory] = useState<string[]>([]);
+  const [pathLoading, setPathLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [resolutionFilter, setResolutionFilter] = useState("all");
@@ -60,11 +64,17 @@ export function VideoLibrary() {
       const saved = JSON.parse(localStorage.getItem(LIBRARY_SETTINGS_KEY) ?? "{}") as {
         view?: LibraryView;
         theme?: LibraryTheme;
+        videoPath?: string;
       };
       if (saved.view === "grid" || saved.view === "cards" || saved.view === "list") {
         setView(saved.view);
       }
       if (saved.theme === "light" || saved.theme === "dark") setTheme(saved.theme);
+      if (saved.videoPath) setPathInput(saved.videoPath);
+      const savedPaths = JSON.parse(localStorage.getItem(PATH_HISTORY_KEY) ?? "[]") as unknown;
+      if (Array.isArray(savedPaths)) {
+        setPathHistory(savedPaths.filter((item): item is string => typeof item === "string").slice(0, 10));
+      }
       const player = JSON.parse(localStorage.getItem(PLAYER_SETTINGS_KEY) ?? "{}") as {
         subtitlesEnabled?: boolean;
         enhanced?: boolean;
@@ -135,23 +145,48 @@ export function VideoLibrary() {
     savePlayerDefaults({ [key]: value });
   };
 
-  /* Load the library once on mount. */
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/videos")
+  const loadLibrary = (directory?: string) => {
+    setPathLoading(true);
+    setLoadError(null);
+    setVideos(null);
+    const query = directory?.trim() ? `?path=${encodeURIComponent(directory.trim())}` : "";
+    fetch(`/api/videos${query}`)
       .then((response) => response.json())
       .then((data: VideosResponse) => {
-        if (cancelled) return;
         setVideos(data.videos);
         setSourceDir(data.sourceDir);
         setLoadError(data.error);
+        setPathLoading(false);
       })
       .catch(() => {
-        if (!cancelled) setLoadError("Couldn't load the video library.");
+        setLoadError("Couldn't load the video library.");
+        setPathLoading(false);
       });
-    return () => {
-      cancelled = true;
+  };
+
+  const savePath = (directory: string) => {
+    const normalized = directory.trim();
+    const nextHistory = normalized
+      ? [normalized, ...pathHistory.filter((item) => item !== normalized)].slice(0, 10)
+      : pathHistory;
+    setPathInput(normalized);
+    setPathHistory(nextHistory);
+    try {
+      localStorage.setItem(PATH_HISTORY_KEY, JSON.stringify(nextHistory));
+      const current = JSON.parse(localStorage.getItem(LIBRARY_SETTINGS_KEY) ?? "{}");
+      localStorage.setItem(LIBRARY_SETTINGS_KEY, JSON.stringify({ ...current, videoPath: normalized }));
+    } catch {
+      // The selected path remains active for this session.
+    }
+    loadLibrary(normalized || undefined);
+  };
+
+  /* Load the library once on mount. */
+  useEffect(() => {
+    const saved = JSON.parse(localStorage.getItem(LIBRARY_SETTINGS_KEY) ?? "{}") as {
+      videoPath?: string;
     };
+    loadLibrary(saved.videoPath);
   }, []);
 
   /* Smart search: debounced input (250ms) so typing feels instant but the
@@ -305,6 +340,51 @@ export function VideoLibrary() {
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">Saved for your next video.</p>
                     <div className="mt-4 space-y-3 text-sm">
+                      <div className="border-b border-white/10 pb-3">
+                        <p className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-wide text-foreground uppercase">
+                          <FolderOpen className="h-3.5 w-3.5 text-primary" />
+                          Video folder
+                        </p>
+                        <form
+                          className="space-y-2"
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            savePath(pathInput);
+                          }}
+                        >
+                          <input
+                            type="text"
+                            value={pathInput}
+                            onChange={(event) => setPathInput(event.target.value)}
+                            placeholder="C:\\Videos"
+                            aria-label="Video folder path"
+                            className="h-9 w-full rounded-lg border border-border/60 bg-background/50 px-2.5 text-xs text-foreground outline-none focus:border-primary/60"
+                          />
+                          <button
+                            type="submit"
+                            disabled={pathLoading}
+                            className="w-full rounded-lg bg-primary/15 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/25 disabled:opacity-50"
+                          >
+                            {pathLoading ? "Loading folder…" : "Load folder"}
+                          </button>
+                        </form>
+                        {pathHistory.length > 0 && (
+                          <div className="mt-3 space-y-1">
+                            <p className="text-[11px] text-muted-foreground">Recent folders</p>
+                            {pathHistory.map((directory) => (
+                              <button
+                                key={directory}
+                                type="button"
+                                onClick={() => savePath(directory)}
+                                className="block w-full truncate rounded px-2 py-1 text-left text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
+                                title={directory}
+                              >
+                                {directory}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                       <div className="border-b border-white/10 pb-3">
                         <p className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-wide text-foreground uppercase">
                           <Sun className="h-3.5 w-3.5 text-primary" />
