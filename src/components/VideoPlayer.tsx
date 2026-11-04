@@ -21,12 +21,14 @@ import {
   Scaling,
   Settings,
   Subtitles,
+  SunMedium,
+  Upload,
   Volume1,
   Volume2,
   VolumeX,
-  WandSparkles,
 } from "lucide-react";
 import { readWatchHistory, saveWatchProgress } from "@/lib/watch-history";
+import { WebSRUpscaler } from "@/components/WebSRUpscaler";
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
 const SUBTITLE_CHUNK_SECONDS = 60;
@@ -34,10 +36,9 @@ const SUBTITLE_CACHE_VERSION = "v16";
 const PLAYER_SETTINGS_KEY = "lumen-player-settings-v2";
 
 interface PlayerSettings {
-  enhanced: boolean;
   upscaled: boolean;
-  enhancementIntensity: number;
-  upscaleIntensity: number;
+  hdr: boolean;
+  upscaleScale: 1 | 2;
   subtitlesEnabled: boolean;
   subtitleSize: number;
   volume: number;
@@ -46,10 +47,9 @@ interface PlayerSettings {
 }
 
 const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
-  enhanced: false,
   upscaled: false,
-  enhancementIntensity: 60,
-  upscaleIntensity: 60,
+  hdr: false,
+  upscaleScale: 2,
   subtitlesEnabled: false,
   subtitleSize: 1.25,
   volume: 1,
@@ -130,10 +130,10 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
   const [fullscreen, setFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [scrubbing, setScrubbing] = useState(false);
-  const [enhanced, setEnhanced] = useState(false);
   const [upscaled, setUpscaled] = useState(false);
-  const [enhancementIntensity, setEnhancementIntensity] = useState(60);
-  const [upscaleIntensity, setUpscaleIntensity] = useState(60);
+  const [hdr, setHdr] = useState(false);
+  const [upscaleScale, setUpscaleScale] = useState<1 | 2>(2);
+  const [upscalerReady, setUpscalerReady] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsLoadedRef = useRef(false);
   const [subtitlesEnabled, setSubtitlesEnabled] = useState(false);
@@ -148,6 +148,15 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
   const subtitleLoadedRef = useRef(new Set<number>());
   const subtitleInFlightRef = useRef(new Set<number>());
   const [error, setError] = useState<string | null>(null);
+  const [localVideoUrl, setLocalVideoUrl] = useState<string | null>(null);
+  const uploadRef = useRef<HTMLInputElement>(null);
+  const playbackSrc = localVideoUrl ?? src;
+
+  useEffect(() => {
+    return () => {
+      if (localVideoUrl) URL.revokeObjectURL(localVideoUrl);
+    };
+  }, [localVideoUrl]);
 
   useEffect(() => {
     try {
@@ -155,10 +164,9 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
       const settings = saved
         ? { ...DEFAULT_PLAYER_SETTINGS, ...(JSON.parse(saved) as Partial<PlayerSettings>) }
         : DEFAULT_PLAYER_SETTINGS;
-      setEnhanced(settings.enhanced);
       setUpscaled(settings.upscaled);
-      setEnhancementIntensity(settings.enhancementIntensity);
-      setUpscaleIntensity(settings.upscaleIntensity);
+      setHdr(settings.hdr);
+      setUpscaleScale(settings.upscaleScale === 1 ? 1 : 2);
       setSubtitlesEnabled(settings.subtitlesEnabled);
       setSubtitleSize(settings.subtitleSize);
       setVolume(settings.volume);
@@ -174,10 +182,9 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
   useEffect(() => {
     if (!settingsLoadedRef.current) return;
     const settings: PlayerSettings = {
-      enhanced,
       upscaled,
-      enhancementIntensity,
-      upscaleIntensity,
+      hdr,
+      upscaleScale,
       subtitlesEnabled,
       subtitleSize,
       volume,
@@ -186,10 +193,9 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
     };
     localStorage.setItem(PLAYER_SETTINGS_KEY, JSON.stringify(settings));
   }, [
-    enhanced,
     upscaled,
-    enhancementIntensity,
-    upscaleIntensity,
+    hdr,
+    upscaleScale,
     subtitlesEnabled,
     subtitleSize,
     volume,
@@ -254,7 +260,7 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
       video.removeEventListener("progress", onProgress);
       video.removeEventListener("error", onError);
     };
-  }, [fileName, src]);
+  }, [fileName, playbackSrc]);
 
   useEffect(() => {
     if (!resumePromptVisible) return;
@@ -545,6 +551,10 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
     }
   }, [current, loadSubtitleChunk, subtitlesEnabled]);
 
+  const handleUpscalerReady = useCallback((ready: boolean) => {
+    setUpscalerReady(ready);
+  }, []);
+
   return (
     <div
       ref={shellRef}
@@ -554,29 +564,33 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
     >
       <video
         ref={videoRef}
-        src={src}
+        src={playbackSrc}
         poster={poster ?? undefined}
         autoPlay={autoPlay}
         playsInline
-        className={`h-full w-full object-contain transition-[filter] duration-300 ${subtitleSizeClass}`}
+        className={`relative z-0 h-full w-full object-contain transition-[filter,opacity] duration-300 ${upscalerReady ? "opacity-0" : ""} ${subtitleSizeClass}`}
         style={{
           filter:
             [
-              enhanced
-                ? `brightness(${1 + enhancementIntensity * 0.001}) contrast(${1 + enhancementIntensity * 0.0025}) saturate(${1 + enhancementIntensity * 0.0025})`
-                : "",
-              upscaled
-                ? `contrast(${1 + upscaleIntensity * 0.0015}) saturate(${1 + upscaleIntensity * 0.0012})`
+              hdr
+                ? "brightness(1.06) contrast(1.12) saturate(1.18)"
                 : "",
             ]
               .filter(Boolean)
               .join(" ") || undefined,
-          transform: upscaled ? `scale(${1 + upscaleIntensity * 0.00015})` : undefined,
-          willChange: upscaled || enhanced ? "filter, transform" : undefined,
+          willChange: upscaled || hdr ? "filter, opacity" : undefined,
         }}
         onClick={togglePlay}
         onDoubleClick={() => void toggleFullscreen()}
       ></video>
+
+      <WebSRUpscaler
+        videoRef={videoRef}
+        enabled={upscaled && upscaleScale === 2}
+        scale={upscaleScale}
+        hdr={hdr}
+        onReadyChange={handleUpscalerReady}
+      />
 
       {activeSubtitle && (
         <div
@@ -713,6 +727,25 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
                     <Play className="h-5 w-5 fill-current" />
                   )}
                 </ControlButton>
+                <ControlButton label="Upload video" onClick={() => uploadRef.current?.click()}>
+                  <Upload className="h-5 w-5" />
+                </ControlButton>
+                <input
+                  ref={uploadRef}
+                  type="file"
+                  accept="video/*"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (!file) return;
+                    setLocalVideoUrl((currentUrl) => {
+                      if (currentUrl) URL.revokeObjectURL(currentUrl);
+                      return URL.createObjectURL(file);
+                    });
+                    setError(null);
+                    event.target.value = "";
+                  }}
+                />
 
                 <ControlButton label="Back 10 seconds" onClick={() => seekBy(-10)}>
                   <RotateCcw className="h-5 w-5" />
@@ -787,11 +820,13 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
                 </div>
 
                 <ControlButton
-                  label={enhanced ? "Disable quality enhancement" : "Enhance video quality"}
-                  active={enhanced}
-                  onClick={() => setEnhanced((value) => !value)}
+                  label={hdr ? "Disable HDR" : "Enable HDR"}
+                  active={hdr}
+                  onClick={() => setHdr((value) => !value)}
+                  wide
                 >
-                  <WandSparkles className="h-5 w-5" />
+                  <SunMedium className="h-4 w-4" />
+                  <span className="text-[11px] font-bold tracking-wide">HDR</span>
                 </ControlButton>
 
                 <ControlButton
@@ -808,7 +843,7 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
                 </ControlButton>
 
                 <ControlButton
-                  label={upscaled ? "Disable upscale preview" : "Enable upscale preview"}
+                  label={upscaled ? "Disable WebSR upscaling" : "Enable WebSR upscaling"}
                   active={upscaled}
                   onClick={() => setUpscaled((value) => !value)}
                 >
@@ -832,16 +867,19 @@ export function VideoPlayer({ src, fileName, title, poster, autoPlay = true }: V
                         className="glass-strong absolute right-0 bottom-full z-20 mb-3 w-64 rounded-xl p-3 text-xs"
                       >
                         <p className="mb-3 font-semibold text-foreground">Playback settings</p>
-                        <SettingSlider
-                          label={`Enhancement ${enhancementIntensity}%`}
-                          value={enhancementIntensity}
-                          onChange={setEnhancementIntensity}
-                        />
-                        <SettingSlider
-                          label={`Upscaling ${upscaleIntensity}%`}
-                          value={upscaleIntensity}
-                          onChange={setUpscaleIntensity}
-                        />
+                        <label className="mb-3 block text-muted-foreground">
+                          <span className="mb-1 block">WebSR scale</span>
+                          <select
+                            value={upscaleScale}
+                            onChange={(event) =>
+                              setUpscaleScale(event.target.value === "1" ? 1 : 2)
+                            }
+                            className="h-8 w-full rounded-md border border-border bg-background px-2 text-foreground"
+                          >
+                            <option value="1">1× Original</option>
+                            <option value="2">2× WebSR AI</option>
+                          </select>
+                        </label>
                         <label className="mt-3 flex items-center justify-between gap-3 text-muted-foreground">
                           <span>Subtitles by default</span>
                           <input
@@ -893,11 +931,13 @@ function ControlButton({
   label,
   onClick,
   active = false,
+  wide = false,
   children,
 }: {
   label: string;
   onClick: () => void;
   active?: boolean;
+  wide?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -906,36 +946,13 @@ function ControlButton({
       aria-label={label}
       title={label}
       onClick={onClick}
-      className={`flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors hover:bg-accent ${
+      className={`flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1 rounded-lg px-2 transition-colors hover:bg-accent ${
+        wide ? "min-w-16" : "w-9"
+      } ${
         active ? "text-primary" : "text-foreground"
       }`}
     >
       {children}
     </button>
-  );
-}
-
-function SettingSlider({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <label className="mb-3 block text-muted-foreground">
-      <span className="mb-1 block">{label}</span>
-      <input
-        type="range"
-        min={10}
-        max={100}
-        step={5}
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
-        className="volume-slider w-full"
-      />
-    </label>
   );
 }

@@ -55,8 +55,8 @@ export function VideoLibrary() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [theme, setTheme] = useState<LibraryTheme>("dark");
   const [defaultSubtitles, setDefaultSubtitles] = useState(false);
-  const [defaultEnhancement, setDefaultEnhancement] = useState(false);
   const [defaultUpscaling, setDefaultUpscaling] = useState(false);
+  const [defaultHdr, setDefaultHdr] = useState(false);
   const [watchHistory, setWatchHistory] = useState<WatchHistoryEntry[]>([]);
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
@@ -82,12 +82,12 @@ export function VideoLibrary() {
       }
       const player = JSON.parse(localStorage.getItem(PLAYER_SETTINGS_KEY) ?? "{}") as {
         subtitlesEnabled?: boolean;
-        enhanced?: boolean;
         upscaled?: boolean;
+        hdr?: boolean;
       };
       setDefaultSubtitles(Boolean(player.subtitlesEnabled));
-      setDefaultEnhancement(Boolean(player.enhanced));
       setDefaultUpscaling(Boolean(player.upscaled));
+      setDefaultHdr(Boolean(player.hdr));
     } catch {
       // Use defaults when local storage is unavailable or malformed.
     }
@@ -143,10 +143,13 @@ export function VideoLibrary() {
     }
   };
 
-  const updateDefault = (key: "subtitlesEnabled" | "enhanced" | "upscaled", value: boolean) => {
+  const updateDefault = (
+    key: "subtitlesEnabled" | "upscaled" | "hdr",
+    value: boolean,
+  ) => {
     if (key === "subtitlesEnabled") setDefaultSubtitles(value);
-    if (key === "enhanced") setDefaultEnhancement(value);
     if (key === "upscaled") setDefaultUpscaling(value);
+    if (key === "hdr") setDefaultHdr(value);
     savePlayerDefaults({ [key]: value });
   };
 
@@ -437,8 +440,8 @@ export function VideoLibrary() {
                       </div>
                       {[
                         ["Subtitles", defaultSubtitles, "subtitlesEnabled"],
-                        ["Quality enhancement", defaultEnhancement, "enhanced"],
                         ["Upscaling", defaultUpscaling, "upscaled"],
+                        ["HDR enhancement", defaultHdr, "hdr"],
                       ].map(([label, checked, key]) => (
                         <label
                           key={key as string}
@@ -450,7 +453,7 @@ export function VideoLibrary() {
                             checked={checked as boolean}
                             onChange={(event) =>
                               updateDefault(
-                                key as "subtitlesEnabled" | "enhanced" | "upscaled",
+                                key as "subtitlesEnabled" | "upscaled" | "hdr",
                                 event.target.checked,
                               )
                             }
