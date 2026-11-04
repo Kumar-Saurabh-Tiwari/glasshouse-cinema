@@ -32,6 +32,7 @@ type LibraryView = "grid" | "cards" | "list";
 type LibraryTheme = "dark" | "light";
 const LIBRARY_SETTINGS_KEY = "lumen-library-settings";
 const PATH_HISTORY_KEY = "lumen-video-path-history";
+const MAX_PATH_HISTORY = 5;
 const PLAYER_SETTINGS_KEY = "lumen-player-settings-v2";
 
 export function VideoLibrary() {
@@ -73,7 +74,11 @@ export function VideoLibrary() {
       if (saved.videoPath) setPathInput(saved.videoPath);
       const savedPaths = JSON.parse(localStorage.getItem(PATH_HISTORY_KEY) ?? "[]") as unknown;
       if (Array.isArray(savedPaths)) {
-        setPathHistory(savedPaths.filter((item): item is string => typeof item === "string").slice(0, 10));
+        setPathHistory(
+          savedPaths
+            .filter((item): item is string => typeof item === "string")
+            .slice(0, MAX_PATH_HISTORY),
+        );
       }
       const player = JSON.parse(localStorage.getItem(PLAYER_SETTINGS_KEY) ?? "{}") as {
         subtitlesEnabled?: boolean;
@@ -167,7 +172,10 @@ export function VideoLibrary() {
   const savePath = (directory: string) => {
     const normalized = directory.trim();
     const nextHistory = normalized
-      ? [normalized, ...pathHistory.filter((item) => item !== normalized)].slice(0, 10)
+      ? [normalized, ...pathHistory.filter((item) => item !== normalized)].slice(
+          0,
+          MAX_PATH_HISTORY,
+        )
       : pathHistory;
     setPathInput(normalized);
     setPathHistory(nextHistory);
@@ -179,6 +187,16 @@ export function VideoLibrary() {
       // The selected path remains active for this session.
     }
     loadLibrary(normalized || undefined);
+  };
+
+  const removePath = (directory: string) => {
+    const nextHistory = pathHistory.filter((item) => item !== directory);
+    setPathHistory(nextHistory);
+    try {
+      localStorage.setItem(PATH_HISTORY_KEY, JSON.stringify(nextHistory));
+    } catch {
+      // The path is removed from the current session when storage is unavailable.
+    }
   };
 
   /* Load the library once on mount. */
@@ -372,15 +390,25 @@ export function VideoLibrary() {
                           <div className="mt-3 space-y-1">
                             <p className="text-[11px] text-muted-foreground">Recent folders</p>
                             {pathHistory.map((directory) => (
-                              <button
-                                key={directory}
-                                type="button"
-                                onClick={() => savePath(directory)}
-                                className="block w-full truncate rounded px-2 py-1 text-left text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
-                                title={directory}
-                              >
-                                {directory}
-                              </button>
+                              <div key={directory} className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => savePath(directory)}
+                                  className="min-w-0 flex-1 truncate rounded px-2 py-1 text-left text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
+                                  title={`Load ${directory}`}
+                                >
+                                  {directory}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removePath(directory)}
+                                  aria-label={`Remove ${directory} from recent folders`}
+                                  title="Remove from recent folders"
+                                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
                             ))}
                           </div>
                         )}
