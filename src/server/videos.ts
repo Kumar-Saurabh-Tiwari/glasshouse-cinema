@@ -257,6 +257,7 @@ export async function listVideos(): Promise<VideosResponse> {
         title,
         fileName: entry.name,
         sizeBytes: fileStat.size,
+        modifiedAt: fileStat.mtimeMs,
         durationSeconds: duration,
         resolution,
         streamUrl: `/api/videos/stream${query}`,

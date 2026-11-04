@@ -19,6 +19,7 @@ interface MovieCardProps {
 
 export function MovieCard({ video, onSelect, onDetails, view = "grid" }: MovieCardProps) {
   const [thumbFailed, setThumbFailed] = useState(false);
+  const [thumbnailLoaded, setThumbnailLoaded] = useState(false);
   const [generatedThumb, setGeneratedThumb] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const previewRef = useRef<HTMLVideoElement>(null);
@@ -83,11 +84,10 @@ export function MovieCard({ video, onSelect, onDetails, view = "grid" }: MovieCa
 
   return (
     <motion.div
-      layout
       initial={{ opacity: 0, y: 24 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.94 }}
-      transition={{ duration: 0.35, ease: "easeOut" }}
+      transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
       whileHover={{ y: -8 }}
       whileTap={{ scale: 0.98 }}
       onClick={() => onSelect(video)}
@@ -101,7 +101,8 @@ export function MovieCard({ video, onSelect, onDetails, view = "grid" }: MovieCa
       }}
       onMouseEnter={startPreview}
       onMouseLeave={stopPreview}
-      className={`glass card-glow group relative block w-full cursor-pointer overflow-hidden rounded-3xl border-white/5 text-left transition-[border-color,box-shadow] duration-300 hover:border-primary/25 hover:shadow-[0_30px_70px_-30px_oklch(0_0_0/80%),var(--glow-primary)] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${view === "list" ? "flex flex-col sm:flex-row sm:items-stretch" : ""}`}
+      style={{ contentVisibility: "auto", containIntrinsicSize: "420px" }}
+      className={`movie-card-surface group relative block w-full cursor-pointer overflow-hidden rounded-3xl border-white/5 text-left transition-[border-color,transform] duration-300 hover:border-primary/25 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${view === "list" ? "flex flex-col sm:flex-row sm:items-stretch" : ""}`}
     >
       <div
         className={`relative overflow-hidden ${
@@ -117,8 +118,11 @@ export function MovieCard({ video, onSelect, onDetails, view = "grid" }: MovieCa
             src={thumbnailUrl}
             alt={video.title}
             loading="lazy"
+            onLoad={() => setThumbnailLoaded(true)}
             onError={() => setThumbFailed(true)}
-            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+            className={`h-full w-full object-cover transition-[opacity,transform] duration-500 ease-out group-hover:scale-105 ${
+              thumbnailLoaded ? "opacity-100" : "opacity-0"
+            }`}
           />
         ) : thumbFailed || !video.thumbnailUrl ? (
           <video
@@ -126,7 +130,7 @@ export function MovieCard({ video, onSelect, onDetails, view = "grid" }: MovieCa
             src={video.streamUrl}
             muted
             playsInline
-            preload="auto"
+            preload="metadata"
             aria-label={`${video.title} preview`}
             onLoadedData={captureBrowserThumbnail}
             onError={() => setThumbFailed(true)}
@@ -137,18 +141,19 @@ export function MovieCard({ video, onSelect, onDetails, view = "grid" }: MovieCa
             <Clapperboard className="h-12 w-12 text-muted-foreground/60" />
           </div>
         )}
-        <video
-          ref={previewRef}
-          src={video.streamUrl}
-          muted
-          playsInline
-          preload="metadata"
-          aria-hidden="true"
-          onLoadedMetadata={seekAndPlayPreview}
-          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${
-            previewing ? "opacity-100" : "pointer-events-none opacity-0"
-          }`}
-        />
+        {previewing && (
+          <video
+            ref={previewRef}
+            src={video.streamUrl}
+            muted
+            playsInline
+            autoPlay
+            preload="none"
+            aria-hidden="true"
+            onLoadedMetadata={seekAndPlayPreview}
+            className="absolute inset-0 h-full w-full object-cover opacity-100"
+          />
+        )}
 
         {/* Readability scrim + duration badge */}
         <div className="scrim pointer-events-none absolute inset-0" />

@@ -12,6 +12,8 @@ export interface VideoMeta {
   fileName: string;
   /** File size in bytes. */
   sizeBytes: number;
+  /** Last modified time of the file, as a Unix timestamp in milliseconds. */
+  modifiedAt: number;
   /** Duration in seconds, or null when ffprobe could not read it. */
   durationSeconds: number | null;
   /** Video resolution, such as 720p or 1920x1080, when available. */

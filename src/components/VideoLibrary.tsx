@@ -3,7 +3,7 @@
  * match), the responsive grid of glass movie cards, and the glass player
  * overlay. Loads the library from /api/videos.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Link } from "@tanstack/react-router";
 import {
@@ -40,6 +40,10 @@ export function VideoLibrary() {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [resolutionFilter, setResolutionFilter] = useState("all");
+  const [durationFilter, setDurationFilter] = useState("all");
+  const [sizeFilter, setSizeFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("title-asc");
+  const [visibleCount, setVisibleCount] = useState(15);
   const [selected, setSelected] = useState<VideoMeta | null>(null);
   const [detailsVideo, setDetailsVideo] = useState<VideoMeta | null>(null);
   const [view, setView] = useState<LibraryView>("grid");
@@ -49,6 +53,7 @@ export function VideoLibrary() {
   const [defaultEnhancement, setDefaultEnhancement] = useState(false);
   const [defaultUpscaling, setDefaultUpscaling] = useState(false);
   const [watchHistory, setWatchHistory] = useState<WatchHistoryEntry[]>([]);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     try {
@@ -158,12 +163,64 @@ export function VideoLibrary() {
 
   const filtered = useMemo(() => {
     if (!videos) return [];
-    return videos.filter((video) => {
+    const matching = videos.filter((video) => {
       const matchesTitle = !debouncedQuery || video.title.toLowerCase().includes(debouncedQuery);
       const matchesResolution = resolutionFilter === "all" || video.resolution === resolutionFilter;
-      return matchesTitle && matchesResolution;
+      const matchesDuration =
+        durationFilter === "all" ||
+        (video.durationSeconds !== null &&
+          (durationFilter === "short"
+            ? video.durationSeconds < 30 * 60
+            : durationFilter === "medium"
+              ? video.durationSeconds >= 30 * 60 && video.durationSeconds <= 2 * 60 * 60
+              : video.durationSeconds > 2 * 60 * 60));
+      const matchesSize =
+        sizeFilter === "all" ||
+        (sizeFilter === "small"
+          ? video.sizeBytes < 1024 ** 3
+          : sizeFilter === "medium"
+            ? video.sizeBytes >= 1024 ** 3 && video.sizeBytes < 5 * 1024 ** 3
+            : video.sizeBytes >= 5 * 1024 ** 3);
+      return matchesTitle && matchesResolution && matchesDuration && matchesSize;
     });
-  }, [videos, debouncedQuery, resolutionFilter]);
+    return [...matching].sort((a, b) => {
+      switch (sortBy) {
+        case "latest":
+          return b.modifiedAt - a.modifiedAt;
+        case "oldest":
+          return a.modifiedAt - b.modifiedAt;
+        case "largest":
+          return b.sizeBytes - a.sizeBytes;
+        case "smallest":
+          return a.sizeBytes - b.sizeBytes;
+        case "longest":
+          return (b.durationSeconds ?? -1) - (a.durationSeconds ?? -1);
+        case "shortest":
+          return (a.durationSeconds ?? Number.MAX_SAFE_INTEGER) - (b.durationSeconds ?? Number.MAX_SAFE_INTEGER);
+        case "title-desc":
+          return b.title.localeCompare(a.title);
+        default:
+          return a.title.localeCompare(b.title);
+      }
+    });
+  }, [videos, debouncedQuery, resolutionFilter, durationFilter, sizeFilter, sortBy]);
+
+  useEffect(() => {
+    setVisibleCount(15);
+  }, [debouncedQuery, resolutionFilter, durationFilter, sizeFilter, sortBy]);
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target || visibleCount >= filtered.length) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) setVisibleCount((count) => Math.min(count + 15, filtered.length));
+      },
+      { rootMargin: "600px" },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [filtered.length, visibleCount]);
 
   const resolutions = useMemo(
     () =>
@@ -309,7 +366,7 @@ export function VideoLibrary() {
           </div>
         </div>
 
-        <div className="mx-auto mt-4 flex max-w-[1600px] flex-col gap-2 sm:flex-row">
+        <div className="mx-auto mt-4 flex max-w-[1600px] flex-col gap-2 sm:flex-row sm:flex-wrap">
           <div className="relative min-w-0 flex-1">
             <Search className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -346,6 +403,52 @@ export function VideoLibrary() {
                   {resolution}
                 </option>
               ))}
+            </select>
+          </label>
+          <label className="glass flex h-11 shrink-0 items-center gap-2 rounded-xl px-3 text-sm text-muted-foreground sm:w-40">
+            <span className="sr-only">Filter by duration</span>
+            <select
+              value={durationFilter}
+              onChange={(event) => setDurationFilter(event.target.value)}
+              aria-label="Filter by duration"
+              className="w-full cursor-pointer bg-transparent text-foreground outline-none"
+            >
+              <option value="all">Any duration</option>
+              <option value="short">Under 30 min</option>
+              <option value="medium">30 min–2 hr</option>
+              <option value="long">Over 2 hours</option>
+            </select>
+          </label>
+          <label className="glass flex h-11 shrink-0 items-center gap-2 rounded-xl px-3 text-sm text-muted-foreground sm:w-36">
+            <span className="sr-only">Filter by file size</span>
+            <select
+              value={sizeFilter}
+              onChange={(event) => setSizeFilter(event.target.value)}
+              aria-label="Filter by file size"
+              className="w-full cursor-pointer bg-transparent text-foreground outline-none"
+            >
+              <option value="all">Any size</option>
+              <option value="small">Under 1 GB</option>
+              <option value="medium">1–5 GB</option>
+              <option value="large">Over 5 GB</option>
+            </select>
+          </label>
+          <label className="glass flex h-11 shrink-0 items-center gap-2 rounded-xl px-3 text-sm text-muted-foreground sm:w-44">
+            <span className="sr-only">Sort videos</span>
+            <select
+              value={sortBy}
+              onChange={(event) => setSortBy(event.target.value)}
+              aria-label="Sort videos"
+              className="w-full cursor-pointer bg-transparent text-foreground outline-none"
+            >
+              <option value="title-asc">Title (A–Z)</option>
+              <option value="title-desc">Title (Z–A)</option>
+              <option value="latest">Latest modified</option>
+              <option value="oldest">Oldest modified</option>
+              <option value="largest">Largest file</option>
+              <option value="smallest">Smallest file</option>
+              <option value="longest">Longest duration</option>
+              <option value="shortest">Shortest duration</option>
             </select>
           </label>
           <div className="glass flex h-11 shrink-0 items-center gap-1 rounded-xl p-1">
@@ -438,28 +541,40 @@ export function VideoLibrary() {
       {videos === null ? (
         <SkeletonGrid />
       ) : filtered.length > 0 ? (
-        <motion.div
-          layout
-          className={
-            view === "list"
-              ? "grid grid-cols-1 gap-4"
-              : view === "cards"
-                ? "grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-                : "grid grid-cols-1 gap-7 sm:grid-cols-2 sm:gap-8 xl:grid-cols-3 xl:gap-9"
-          }
-        >
-          <AnimatePresence mode="popLayout">
-            {filtered.map((video) => (
-              <MovieCard
-                key={video.id}
-                video={video}
-                onSelect={setSelected}
-                onDetails={setDetailsVideo}
-                view={view}
-              />
-            ))}
-          </AnimatePresence>
-        </motion.div>
+        <>
+          <motion.div
+            className={
+              view === "list"
+                ? "grid grid-cols-1 gap-4"
+                : view === "cards"
+                  ? "grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                  : "grid grid-cols-1 gap-7 sm:grid-cols-2 sm:gap-8 xl:grid-cols-3 xl:gap-9"
+            }
+          >
+            <AnimatePresence initial={false}>
+              {filtered.slice(0, visibleCount).map((video) => (
+                <MovieCard
+                  key={video.id}
+                  video={video}
+                  onSelect={setSelected}
+                  onDetails={setDetailsVideo}
+                  view={view}
+                />
+              ))}
+            </AnimatePresence>
+          </motion.div>
+          <div
+            ref={loadMoreRef}
+            className="flex min-h-16 items-center justify-center"
+            aria-live="polite"
+          >
+            {visibleCount < filtered.length && (
+              <p className="text-xs text-muted-foreground">
+                Showing {Math.min(visibleCount, filtered.length)} of {filtered.length} videos…
+              </p>
+            )}
+          </div>
+        </>
       ) : (
         <div className="glass flex flex-col items-center gap-3 rounded-3xl py-24 text-center">
           <Search className="h-10 w-10 text-muted-foreground/60" />
@@ -591,9 +706,14 @@ function SkeletonGrid() {
       {Array.from({ length: 6 }).map((_, index) => (
         <div
           key={index}
-          className="glass aspect-video animate-pulse rounded-3xl"
-          style={{ animationDelay: `${index * 120}ms` }}
-        />
+          className="glass skeleton-shimmer aspect-[16/10] overflow-hidden rounded-3xl"
+          style={{ animationDelay: `${index * 90}ms` }}
+        >
+          <div className="flex h-full flex-col justify-end gap-3 p-5">
+            <div className="h-5 w-3/4 rounded-full bg-foreground/10" />
+            <div className="h-3 w-1/2 rounded-full bg-foreground/8" />
+          </div>
+        </div>
       ))}
     </div>
   );

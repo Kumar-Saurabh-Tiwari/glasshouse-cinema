@@ -125,12 +125,25 @@ html.light {
     color-scheme: dark;
   }
 
+  select {
+    color-scheme: dark;
+  }
+
+  select option {
+    background-color: var(--popover);
+    color: var(--popover-foreground);
+  }
+
   html.light body {
     background:
       radial-gradient(900px 560px at 8% -10%, oklch(0.96 0.05 78 / 0.7), transparent 68%),
       radial-gradient(900px 620px at 100% 0%, oklch(0.88 0.045 48 / 0.45), transparent 70%),
       radial-gradient(800px 560px at 50% 110%, oklch(0.89 0.035 95 / 0.5), transparent 72%),
       linear-gradient(145deg, oklch(0.95 0.018 85), oklch(0.88 0.03 55));
+    color-scheme: light;
+  }
+
+  html.light select {
     color-scheme: light;
   }
 
@@ -221,9 +234,48 @@ html.light {
     inset 0 1px 0 oklch(1 0 0 / 9%);
 }
 
+.movie-card-surface {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 7%), 0 10px 24px -22px oklch(0 0 0 / 80%);
+  contain: layout paint;
+}
+
+.movie-card-surface .glass {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 /* Thin styled range input (volume). */
 @utility volume-slider {
   accent-color: var(--color-primary);
   height: 1.25rem;
   cursor: pointer;
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -50% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background:
+    linear-gradient(
+      105deg,
+      var(--glass-bg) 28%,
+      color-mix(in oklab, var(--foreground) 9%, transparent) 40%,
+      var(--glass-bg) 52%
+    );
+  background-size: 250% 100%;
+  animation: skeleton-shimmer 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-shimmer {
+    animation: none;
+  }
 }
